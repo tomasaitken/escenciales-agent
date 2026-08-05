@@ -82,11 +82,6 @@ async def transcribir_audio(contenido: bytes, mime_type: str) -> str:
         model=os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe"),
         file=(f"audio{extension}", contenido, mime),
         language="es",
-        keywords=[
-            "electroestimulador TENS", "Ducha Masajeadora Spa Pro",
-            "antena Full HD 4K", "contraentrega", "Blue Express",
-            "Copec", "Dropi",
-        ],
         prompt=(
             "Audio de un cliente chileno de la tienda ESENCIALES. Vocabulario: "
             "electroestimulador TENS, Ducha Masajeadora Spa Pro, antena Full HD 4K, "

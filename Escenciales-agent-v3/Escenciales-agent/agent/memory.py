@@ -9,10 +9,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./escenciales.db")
+def normalizar_url_bd(valor: str | None) -> str:
+    """Normaliza la URL de Railway y mantiene el agente disponible en desarrollo.
 
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    Railway puede entregar una variable aún vacía mientras se aplica una referencia
+    entre servicios. En ese caso usamos /tmp, que es escribible por el usuario no
+    privilegiado del contenedor. La memoria temporal se reemplaza automáticamente
+    cuando exista una URL PostgreSQL válida.
+    """
+    url = (valor or "").strip().strip('"').strip("'")
+    if url.startswith("DATABASE_URL="):
+        url = url.split("=", 1)[1].strip()
+    if not url or url.startswith("${{"):
+        return "sqlite+aiosqlite:////tmp/escenciales.db"
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+DATABASE_URL = normalizar_url_bd(os.getenv("DATABASE_URL"))
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
