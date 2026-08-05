@@ -1,0 +1,129 @@
+import hashlib
+import hmac
+import json
+import os
+import unittest
+
+from fastapi import HTTPException, Request
+
+from agent.brain import cargar_system_prompt
+from agent.providers.meta_multichannel import ProveedorMetaMulticanal
+
+
+def request_con_firma(firma: str) -> Request:
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/webhook",
+        "headers": [(b"x-hub-signature-256", firma.encode("ascii"))],
+        "query_string": b"",
+        "server": ("test", 443),
+        "client": ("127.0.0.1", 1234),
+        "scheme": "https",
+    }
+    return Request(scope)
+
+
+def request_con_body(body: bytes, firma: str) -> Request:
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/webhook",
+        "headers": [(b"x-hub-signature-256", firma.encode("ascii"))],
+        "query_string": b"",
+        "server": ("test", 443),
+        "client": ("127.0.0.1", 1234),
+        "scheme": "https",
+    }
+    entregado = False
+
+    async def receive():
+        nonlocal entregado
+        if entregado:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        entregado = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return Request(scope, receive)
+
+
+class SeguridadWebhookTests(unittest.TestCase):
+    def setUp(self):
+        self.secreto_anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        self.provider = ProveedorMetaMulticanal()
+
+    def tearDown(self):
+        if self.secreto_anterior is None:
+            os.environ.pop("META_APP_SECRET", None)
+        else:
+            os.environ["META_APP_SECRET"] = self.secreto_anterior
+
+    def test_acepta_firma_hmac_valida(self):
+        body = b'{"entry":[]}'
+        digest = hmac.new(
+            b"secreto-de-prueba-no-real", body, hashlib.sha256
+        ).hexdigest()
+        self.provider._validar_firma(request_con_firma(f"sha256={digest}"), body)
+
+    def test_rechaza_firma_invalida(self):
+        with self.assertRaises(HTTPException) as contexto:
+            self.provider._validar_firma(
+                request_con_firma("sha256=" + "0" * 64), b'{"entry":[]}'
+            )
+        self.assertEqual(contexto.exception.status_code, 401)
+
+    def test_rechaza_url_de_audio_fuera_de_meta(self):
+        with self.assertRaises(ValueError):
+            self.provider._validar_url_media("https://example.com/audio.ogg")
+
+
+class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parsea_audio_whatsapp(self):
+        anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{
+                    "changes": [{
+                        "field": "messages",
+                        "value": {"messages": [{
+                            "from": "56911111111",
+                            "id": "wamid.audio-1",
+                            "type": "audio",
+                            "audio": {"id": "media-1", "mime_type": "audio/ogg"},
+                        }]},
+                    }],
+                }],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            request = request_con_body(body, f"sha256={digest}")
+            mensajes = await provider.parsear_webhook(request)
+            self.assertEqual(len(mensajes), 1)
+            self.assertEqual(mensajes[0].tipo, "audio")
+            self.assertEqual(mensajes[0].media_id, "media-1")
+        finally:
+            if anterior is None:
+                os.environ.pop("META_APP_SECRET", None)
+            else:
+                os.environ["META_APP_SECRET"] = anterior
+
+
+class ConfiguracionTests(unittest.TestCase):
+    def test_catalogo_se_inyecta_en_prompt(self):
+        prompt = cargar_system_prompt("instagram")
+        self.assertIn("Electroestimulador TENS", prompt)
+        self.assertIn("Ducha Masajeadora Spa Pro", prompt)
+        self.assertIn("Antena Digital Full HD 4K", prompt)
+        self.assertIn("Instagram DM", prompt)
+        self.assertIn("29990", prompt)
+        self.assertIn("chilessentials.cl/products/maquina-electroestimulador", prompt)
+        self.assertIn("Releasit COD", prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()

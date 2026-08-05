@@ -1,0 +1,225 @@
+tenant_id: escenciales
+
+agente:
+  nombre: "Equipo ESENCIALES"
+  rol: "asesor comercial omnicanal"
+
+negocio:
+  nombre_publico: "ESENCIALES"
+  alias_usuario: "Escenciales"
+  tipo: "Tienda online Shopify con pago contraentrega"
+  pais: "Chile"
+  sitio_web: "https://chilessentials.cl/"
+  dominio_shopify_publico: "01ix5u-wa.myshopify.com"
+  email: "contacto@chilessentials.cl"
+  telefono: "+56 9 3866 3898"
+  direccion_publicada_privacidad: "Juan XXIII 5560, 33, Santiago RM, Chile"
+  fuente: "Sitio público chilessentials.cl"
+  verificado_el: "2026-08-04"
+
+canales:
+  whatsapp: true
+  instagram: true
+  messenger: true
+
+venta:
+  moneda: "CLP"
+  metodo_pago:
+    nombre: "Pago contraentrega / pago al recibir"
+    estado_publicado: true
+    aplicacion_shopify: "Releasit COD Form"
+    tarifa_contraentrega: 0
+    explicacion: >
+      El formulario publicado indica que el cliente recibe primero y paga al momento
+      de la entrega. No pide pago anticipado dentro del flujo contraentrega.
+  despacho:
+    gestion_backend_declarada_por_propietario: "Dropi"
+    transportista_publicado: "Blue Express / Copec"
+    costo_clp: 0
+    mensaje_marketing: "Envío gratis a todo Chile"
+    plazo_santiago: "1 a 3 días"
+    plazo_regiones: "2 a 5 días"
+    regla_plazo: "Es un plazo publicado, no una garantía. No dice si son días hábiles."
+    regiones_disponibles_en_formulario:
+      - Coquimbo
+      - Valparaíso
+      - Santiago / Región Metropolitana
+      - O’Higgins
+      - Maule
+      - Ñuble
+      - Biobío
+      - Araucanía
+      - Los Ríos
+      - Los Lagos
+    regiones_excluidas_en_configuracion_formulario:
+      - Arica y Parinacota
+      - Tarapacá
+      - Antofagasta
+      - Atacama
+      - Aysén
+      - Magallanes
+    regla_cobertura: >
+      Existe una contradicción entre "todo Chile" y las regiones eliminadas del
+      formulario. Antes de prometer despacho pregunta la región. Si está excluida,
+      explica que el formulario no la muestra y deriva al contacto humano.
+  pedido:
+    integracion_publicada: >
+      Cada página de producto abre un formulario Releasit COD que crea el pedido
+      en Shopify. El formulario no guarda el pedido como borrador.
+    ruta_preferida: >
+      Confirmar producto, cantidad y región; luego enviar la URL oficial del producto
+      para que el cliente complete el formulario seguro "PAGA Contra ENTREGA".
+    datos_obligatorios_formulario:
+      - nombre
+      - apellido
+      - WhatsApp
+      - dirección
+      - referencia de dirección
+      - región
+      - ciudad o comuna
+    datos_opcionales_formulario:
+      - código postal
+      - correo electrónico
+      - nota del pedido
+    datos_no_solicitar_por_chat:
+      - contraseña
+      - datos de tarjeta
+      - claves bancarias
+      - fotografías de documentos
+    regla_chat: >
+      Si el cliente no puede usar el formulario y pide comprar por chat, recopila
+      solo los campos obligatorios, resume y deriva para ingreso manual. Nunca
+      afirmes que el pedido fue creado mientras no exista confirmación del sistema.
+
+catalogo:
+  - product_id: 15172731404656
+    variant_id: 54012229452144
+    sku: "74500084"
+    nombre: "Máquina Electroestimulador TENS"
+    nombre_comercial: "Electroestimulador TENS de 4 Electrodos"
+    tipo: "Salud"
+    url: "https://chilessentials.cl/products/maquina-electroestimulador"
+    precio_clp: 29990
+    precio_antes_clp: 33990
+    disponible_publicado: true
+    variantes: "Sin variantes publicadas"
+    imagen_principal: "https://cdn.shopify.com/s/files/1/1006/9632/6512/files/Gpt4.png?v=1783888021"
+    caracteristicas_publicadas:
+      - 4 electrodos
+      - pantalla digital
+      - múltiples modos y niveles de intensidad
+      - diseño compacto y portátil
+      - permite estimular una o más zonas al mismo tiempo
+    claims_marketing_publicados:
+      - ayuda a aliviar tensión y molestias musculares
+      - favorece relajación y recuperación muscular
+    oferta_cantidad:
+      estado: "NO INFORMAR HASTA CORREGIR"
+      texto_visible: "2 unidades con $10.000 de descuento"
+      valor_interno_configurado: "$9.000 de descuento"
+      motivo: "La configuración pública es contradictoria."
+    reglas_especiales:
+      - "Atribuir los beneficios como información de la ficha del producto, no como garantía médica."
+      - "No presentar el producto como diagnóstico, cura ni sustituto de atención médica."
+      - "No improvisar colocación, duración, intensidad, contraindicaciones o resultados."
+      - "Ante embarazo, marcapasos, implantes, dolor, lesión o condición médica, escalar."
+      - "Para uso y seguridad, remitir al manual oficial incluido con el producto."
+    garantia: "[PENDIENTE_POLITICA]"
+
+  - product_id: 15146976772464
+    variant_id: 53942908322160
+    sku: "12544"
+    nombre: "Ducha Masajeadora Spa Pro"
+    tipo: "Salud"
+    url: "https://chilessentials.cl/products/%F0%9F%94%A5-cabezal-ducha-masajeadora-spa"
+    precio_clp: 23990
+    precio_antes_clp: 27990
+    disponible_publicado: true
+    variantes: "Sin variantes publicadas"
+    imagen_principal: "https://cdn.shopify.com/s/files/1/1006/9632/6512/files/3MODOSDECHORRO.png?v=1782599904"
+    caracteristicas_publicadas:
+      - 3 modos de chorro
+      - botón STOP integrado
+      - efecto masaje
+      - instalación rápida
+      - la ficha afirma mayor presión y ahorro de agua
+    oferta_cantidad:
+      cantidad: 2
+      descuento_total_clp: 10000
+      total_estimado_clp: 37980
+      regla: "Confirmar que la oferta siga visible antes de prometerla."
+    compatibilidad: "[PENDIENTE_TIPO_DE_CONEXION_Y_MEDIDAS]"
+    contenido_paquete: "[PENDIENTE]"
+    garantia: "[PENDIENTE_POLITICA]"
+
+  - product_id: 15140033003888
+    variant_id: 53910086058352
+    sku: "M - ANTENA DIGITAL FULL HD 4K - CAJA"
+    nombre: "Antena Digital Full HD 4K"
+    tipo: "Hogar"
+    url: "https://chilessentials.cl/products/m-antena-digital-full-hd-4k-caja"
+    precio_clp: 22990
+    precio_antes_clp: 29990
+    disponible_publicado: true
+    variantes: "Sin variantes publicadas"
+    imagen_principal: "https://cdn.shopify.com/s/files/1/1006/9632/6512/files/ChatGPTImage15jun2026_04_00_39p.m..png?v=1781554014"
+    caracteristicas_publicadas:
+      - antena HDTV interior con amplificador
+      - recepción omnidireccional de 360 grados
+      - construcción metálica
+      - canales locales HD gratuitos cuando existe señal disponible
+    claim_alcance_publicado: "322 km"
+    regla_recepcion: >
+      No garantizar cantidad de canales, señal, calidad ni alcance. La recepción
+      depende de ubicación, cobertura local, obstáculos, instalación y televisor.
+    oferta_cantidad:
+      cantidad: 2
+      descuento_total_clp: 10000
+      total_estimado_clp: 35980
+      regla: "Confirmar que la oferta siga visible antes de prometerla."
+    compatibilidad: "[PENDIENTE_CONECTORES_Y_REQUISITOS_DEL_TV]"
+    contenido_paquete: "[PENDIENTE]"
+    garantia: "[PENDIENTE_POLITICA]"
+
+politicas:
+  privacidad_url: "https://chilessentials.cl/policies/privacy-policy"
+  cambios_devoluciones: "No existe una página pública funcional encontrada."
+  envios: "No existe una página pública funcional; se usa la información del formulario COD."
+  terminos: "El enlace del formulario apunta a una página que responde 404 y la aceptación está desactivada."
+  tratamiento_datos: >
+    La política publicada contempla datos de contacto, pedido, envío, comunicaciones,
+    marketing, prevención de fraude y proveedores como Shopify.
+  derechos_privacidad: >
+    Solicitudes o reclamos se derivan al +56 9 3866 3898 o a
+    contacto@chilessentials.cl.
+
+objeciones:
+  precio: "Usar precio actual y precio anterior publicados. No inventar descuentos."
+  confianza: >
+    Explicar que el pago contraentrega se completa desde el formulario oficial de
+    la página del producto: recibe primero y paga al entregar.
+  demora: "Informar los plazos publicados como estimados y aclarar que no indican días hábiles."
+  compatibilidad: "Usar solo la ficha publicada; si no contiene el dato, escalar."
+  cobertura: "Validar región contra la lista del formulario antes de prometer envío."
+
+handoff:
+  contacto: "Equipo ESENCIALES"
+  telefono: "+56 9 3866 3898"
+  email: "contacto@chilessentials.cl"
+  triggers:
+    - queja, amenaza, fraude, contracargo o conflicto
+    - solicitud de cancelación o cambio de un pedido ya ingresado
+    - pregunta médica o de seguridad sobre el TENS
+    - cliente pide hablar con una persona
+    - región excluida o cobertura dudosa
+    - garantía, devolución, compatibilidad o política no publicada
+    - oferta de dos TENS por inconsistencia de descuento
+    - solicitud de acceso, rectificación o eliminación de datos
+    - mensaje abusivo, autolesión, emergencia o contenido sensible
+
+metadata:
+  fuente_catalogo: "https://chilessentials.cl/products.json?limit=250"
+  fuente_paginas: "sitemap.xml y páginas públicas de producto"
+  fuente_checkout: "Configuración pública Releasit COD Form"
+  inventario_es_snapshot: true
+  nota: "Precio y disponibilidad deben revisarse si cambia la tienda."
