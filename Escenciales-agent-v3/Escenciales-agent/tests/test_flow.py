@@ -68,6 +68,39 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await resolver_handoff(ticket["id"]))
             self.assertFalse(await conversacion_pausada(conversacion))
 
+    async def test_respuesta_manual_pausa_el_bot_sin_responder(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        respuesta_manual = MensajeEntrante(
+            telefono=contacto,
+            texto="Hola, yo te ayudo personalmente con el pedido.",
+            mensaje_id="echo-" + uuid.uuid4().hex,
+            es_propio=True,
+            canal="whatsapp",
+            tipo="operator_echo",
+        )
+
+        with patch.object(main, "proveedor", proveedor):
+            await main.procesar_mensajes([respuesta_manual])
+            self.assertEqual(proveedor.enviados, [])
+
+            conversacion = f"whatsapp:{contacto}"
+            self.assertTrue(await conversacion_pausada(conversacion))
+
+            cliente = MensajeEntrante(
+                telefono=contacto,
+                texto="Gracias, esta es mi dirección.",
+                mensaje_id="msg-" + uuid.uuid4().hex,
+                es_propio=False,
+                canal="whatsapp",
+            )
+            await main.procesar_mensajes([cliente])
+            self.assertEqual(proveedor.enviados, [])
+
+            pendientes = await listar_handoffs("pendiente")
+            ticket = next(t for t in pendientes if t["conversacion_id"] == conversacion)
+            self.assertEqual(ticket["motivo"], "operador_manual")
+
 
 if __name__ == "__main__":
     unittest.main()

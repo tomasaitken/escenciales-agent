@@ -112,6 +112,43 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             else:
                 os.environ["META_APP_SECRET"] = anterior
 
+    async def test_parsea_respuesta_manual_de_whatsapp_coexistente(self):
+        anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{
+                    "changes": [{
+                        "field": "smb_message_echoes",
+                        "value": {"message_echoes": [{
+                            "from": "56938663898",
+                            "to": "56911111111",
+                            "id": "wamid.manual-1",
+                            "type": "text",
+                            "text": {"body": "Yo sigo atendiendo este caso."},
+                        }]},
+                    }],
+                }],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            request = request_con_body(body, f"sha256={digest}")
+            mensajes = await provider.parsear_webhook(request)
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertTrue(mensajes[0].es_propio)
+            self.assertEqual(mensajes[0].telefono, "56911111111")
+            self.assertEqual(mensajes[0].tipo, "operator_echo")
+            self.assertEqual(mensajes[0].texto, "Yo sigo atendiendo este caso.")
+        finally:
+            if anterior is None:
+                os.environ.pop("META_APP_SECRET", None)
+            else:
+                os.environ["META_APP_SECRET"] = anterior
+
 
 class ConfiguracionTests(unittest.TestCase):
     def test_catalogo_se_inyecta_en_prompt(self):

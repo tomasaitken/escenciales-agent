@@ -103,6 +103,27 @@ async def procesar_mensajes(mensajes):
     for msg in mensajes:
         try:
             if msg.es_propio:
+                if not msg.telefono:
+                    continue
+                if not await registrar_evento_si_nuevo(msg.mensaje_id):
+                    logger.info("Webhook de operador duplicado ignorado")
+                    continue
+
+                conversacion_id = f"{msg.canal}:{msg.telefono}"
+                texto_manual = msg.texto.strip() or "[Respuesta manual del equipo]"
+                await guardar_mensaje(conversacion_id, "assistant", texto_manual)
+                await crear_handoff(
+                    conversacion_id,
+                    msg.canal,
+                    msg.telefono,
+                    "operador_manual",
+                    texto_manual,
+                )
+                contacto_hash = hashlib.sha256(msg.telefono.encode()).hexdigest()[:10]
+                logger.info(
+                    "Respuesta manual detectada; bot pausado contacto=%s",
+                    contacto_hash,
+                )
                 continue
             if not await registrar_evento_si_nuevo(msg.mensaje_id):
                 logger.info("Webhook duplicado ignorado")

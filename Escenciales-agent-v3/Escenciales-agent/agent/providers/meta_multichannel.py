@@ -49,9 +49,31 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
         for entry in body.get("entry", []):
             for change in entry.get("changes", []):
-                if change.get("field") != "messages":
-                    continue
+                field = change.get("field")
                 value = change.get("value", {})
+
+                if field == "smb_message_echoes":
+                    for echo in value.get("message_echoes", []):
+                        destinatario = echo.get("to", "")
+                        if not destinatario:
+                            continue
+                        tipo = echo.get("type", "unknown")
+                        if tipo == "text":
+                            texto = echo.get("text", {}).get("body", "")
+                        else:
+                            texto = f"[Mensaje manual del equipo: {tipo}]"
+                        mensajes.append(MensajeEntrante(
+                            telefono=destinatario,
+                            texto=texto,
+                            mensaje_id=echo.get("id", ""),
+                            es_propio=True,
+                            canal="whatsapp",
+                            tipo="operator_echo",
+                        ))
+                    continue
+
+                if field != "messages":
+                    continue
                 for msg in value.get("messages", []):
                     if msg.get("type") == "text":
                         mensajes.append(MensajeEntrante(
