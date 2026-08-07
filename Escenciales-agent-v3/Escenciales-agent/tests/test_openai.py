@@ -6,10 +6,19 @@ from unittest.mock import patch
 import httpx
 from openai import AsyncOpenAI
 
-from agent.brain import generar_respuesta
+from agent.brain import cargar_system_prompt, generar_respuesta
 
 
 class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
+    def test_prompt_exige_un_tono_humano_y_no_burocratico(self):
+        prompt = cargar_system_prompt("whatsapp")
+
+        self.assertIn("CONVERSACIÓN HUMANA — REGLA CENTRAL", prompt)
+        self.assertIn('Nunca digas "según la ficha"', prompt)
+        self.assertIn("no como un manual, catálogo o call center", prompt)
+        self.assertIn("responde con honestidad", prompt)
+        self.assertIn("Canal activo: WhatsApp", prompt)
+
     async def test_usa_responses_api_y_modelo_configurado(self):
         async def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.url.path, "/v1/responses")

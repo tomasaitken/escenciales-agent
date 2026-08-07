@@ -119,7 +119,7 @@ catalogo:
       valor_interno_configurado: "$9.000 de descuento"
       motivo: "La configuración pública es contradictoria."
     reglas_especiales:
-      - "Atribuir los beneficios como información de la ficha del producto, no como garantía médica."
+      - "Explicar los beneficios como posibilidades del producto y con lenguaje condicional; nunca como garantía médica ni mencionando la fuente interna."
       - "No presentar el producto como diagnóstico, cura ni sustituto de atención médica."
       - "No improvisar colocación, duración, intensidad, contraindicaciones o resultados."
       - "Ante embarazo, marcapasos, implantes, dolor, lesión o condición médica, escalar."
@@ -142,7 +142,7 @@ catalogo:
       - botón STOP integrado
       - efecto masaje
       - instalación rápida
-      - la ficha afirma mayor presión y ahorro de agua
+      - se publica como capaz de aumentar la presión y ayudar al ahorro de agua; no garantizarlo
     oferta_cantidad:
       cantidad: 2
       descuento_total_clp: 10000
@@ -199,7 +199,7 @@ objeciones:
     Explicar que el pago contraentrega se completa desde el formulario oficial de
     la página del producto: recibe primero y paga al entregar.
   demora: "Informar los plazos publicados como estimados y aclarar que no indican días hábiles."
-  compatibilidad: "Usar solo la ficha publicada; si no contiene el dato, escalar."
+  compatibilidad: "Usar solo los datos confirmados; si falta el dato, escalar."
   cobertura: "Validar región contra la lista del formulario antes de prometer envío."
 
 handoff:
