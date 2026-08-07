@@ -130,6 +130,56 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             else:
                 os.environ["META_APP_SECRET"] = anterior
 
+    async def test_parsea_respuesta_manual_de_messenger_y_omite_echo_del_bot(self):
+        nombres = ("META_APP_SECRET", "META_APP_ID", "FB_PAGE_ID")
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        os.environ["META_APP_ID"] = "app-escenciales"
+        os.environ["FB_PAGE_ID"] = "pagina-escenciales"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{"messaging": [
+                    {
+                        "sender": {"id": "pagina-escenciales"},
+                        "recipient": {"id": "cliente-1"},
+                        "message": {
+                            "mid": "manual-messenger-1",
+                            "is_echo": True,
+                            "text": "Yo continúo atendiendo este caso.",
+                        },
+                    },
+                    {
+                        "sender": {"id": "pagina-escenciales"},
+                        "recipient": {"id": "cliente-2"},
+                        "message": {
+                            "mid": "bot-messenger-1",
+                            "is_echo": True,
+                            "app_id": "app-escenciales",
+                            "text": "Respuesta enviada por el bot.",
+                        },
+                    },
+                ]}],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            request = request_con_body(body, f"sha256={digest}")
+            mensajes = await provider.parsear_webhook(request)
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertTrue(mensajes[0].es_propio)
+            self.assertEqual(mensajes[0].telefono, "cliente-1")
+            self.assertEqual(mensajes[0].canal, "messenger")
+            self.assertEqual(mensajes[0].tipo, "operator_echo")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
     async def test_parsea_respuesta_manual_de_whatsapp_coexistente(self):
         anterior = os.environ.get("META_APP_SECRET")
         os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"

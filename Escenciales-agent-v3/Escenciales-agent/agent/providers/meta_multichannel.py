@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
     def __init__(self):
+        self.app_id = os.getenv("META_APP_ID")
         self.wa_token = os.getenv("META_ACCESS_TOKEN")
         self.page_token = os.getenv("META_PAGE_ACCESS_TOKEN") or self.wa_token
         self.app_secret = os.getenv("META_APP_SECRET")
@@ -101,6 +102,29 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 sender_id = messaging.get("sender", {}).get("id", "")
                 recipient_id = messaging.get("recipient", {}).get("id", "")
                 msg = messaging.get("message", {})
+
+                if msg.get("is_echo"):
+                    if str(msg.get("app_id", "")) == str(self.app_id or ""):
+                        continue
+                    if sender_id == self.ig_page_id:
+                        canal = "instagram"
+                    elif sender_id == self.fb_page_id:
+                        canal = "messenger"
+                    else:
+                        continue
+                    texto = msg.get("text", "")
+                    if not texto and msg.get("attachments"):
+                        texto = "[Adjunto enviado manualmente por el equipo]"
+                    if texto and recipient_id:
+                        mensajes.append(MensajeEntrante(
+                            telefono=recipient_id,
+                            texto=texto,
+                            mensaje_id=msg.get("mid", ""),
+                            es_propio=True,
+                            canal=canal,
+                            tipo="operator_echo",
+                        ))
+                    continue
 
                 if sender_id in [self.ig_page_id, self.fb_page_id, self.wa_phone_id]:
                     continue
