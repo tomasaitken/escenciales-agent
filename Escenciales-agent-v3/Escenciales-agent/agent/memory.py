@@ -47,7 +47,7 @@ class Mensaje(Base):
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -57,7 +57,7 @@ class EventoEntrante(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     mensaje_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -69,7 +69,7 @@ class EstadoConversacion(Base):
     estado: Mapped[str] = mapped_column(String(30), default="bot_activo")
     motivo: Mapped[str | None] = mapped_column(String(100), nullable=True)
     actualizado: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -84,10 +84,10 @@ class HandoffTicket(Base):
     resumen: Mapped[str] = mapped_column(Text)
     estado: Mapped[str] = mapped_column(String(30), default="pendiente", index=True)
     creado: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     actualizado: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 

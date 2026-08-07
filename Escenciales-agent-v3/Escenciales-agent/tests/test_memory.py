@@ -5,10 +5,15 @@ import uuid
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 from agent.memory import (  # noqa: E402
+    EstadoConversacion,
+    EventoEntrante,
+    HandoffTicket,
+    Mensaje,
     conversacion_pausada,
     crear_handoff,
     inicializar_db,
     listar_handoffs,
+    purgar_datos_antiguos,
     resolver_handoff,
 )
 
@@ -35,6 +40,18 @@ class HandoffPersistenciaTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await resolver_handoff(ticket["id"]))
         self.assertFalse(await conversacion_pausada(conversacion))
         self.assertFalse(await resolver_handoff(ticket["id"]))
+
+    async def test_fechas_con_zona_horaria_y_purga_compatible_con_postgres(self):
+        columnas = [
+            Mensaje.__table__.c.timestamp,
+            EventoEntrante.__table__.c.timestamp,
+            EstadoConversacion.__table__.c.actualizado,
+            HandoffTicket.__table__.c.creado,
+            HandoffTicket.__table__.c.actualizado,
+        ]
+
+        self.assertTrue(all(columna.type.timezone for columna in columnas))
+        await purgar_datos_antiguos(90)
 
 
 if __name__ == "__main__":
