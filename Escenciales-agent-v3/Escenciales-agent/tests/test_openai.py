@@ -18,6 +18,9 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("no como un manual, catálogo o call center", prompt)
         self.assertIn("responde con honestidad", prompt)
         self.assertIn("Canal activo: WhatsApp", prompt)
+        self.assertIn("lugar sin obstáculos", prompt)
+        self.assertIn("El envío es gratis", prompt)
+        self.assertIn("al momento de recibir el producto", prompt)
 
     async def test_usa_responses_api_y_modelo_configurado(self):
         async def handler(request: httpx.Request) -> httpx.Response:

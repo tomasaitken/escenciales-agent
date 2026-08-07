@@ -30,8 +30,8 @@ venta:
     aplicacion_shopify: "Releasit COD Form"
     tarifa_contraentrega: 0
     explicacion: >
-      El formulario publicado indica que el cliente recibe primero y paga al momento
-      de la entrega. No pide pago anticipado dentro del flujo contraentrega.
+      El envío es gratis. El pago se realiza contraentrega, es decir, al momento
+      de recibir el producto. No se pide pago anticipado.
   despacho:
     gestion_backend_declarada_por_propietario: "Dropi"
     transportista_publicado: "Blue Express / Copec"
@@ -170,8 +170,9 @@ catalogo:
       - canales locales HD gratuitos cuando existe señal disponible
     claim_alcance_publicado: "322 km"
     regla_recepcion: >
-      No garantizar cantidad de canales, señal, calidad ni alcance. La recepción
-      depende de ubicación, cobertura local, obstáculos, instalación y televisor.
+      No garantizar cantidad de canales, señal, calidad ni alcance. Para favorecer
+      la recepción, instalar la antena en un lugar sin obstáculos. La señal también
+      depende de la ubicación, la cobertura local y el televisor.
     oferta_cantidad:
       cantidad: 2
       descuento_total_clp: 10000
