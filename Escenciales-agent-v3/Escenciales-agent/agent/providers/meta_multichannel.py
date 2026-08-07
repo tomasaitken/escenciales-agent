@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
     def __init__(self):
-        self.page_token = os.getenv("META_ACCESS_TOKEN")
+        self.wa_token = os.getenv("META_ACCESS_TOKEN")
+        self.page_token = os.getenv("META_PAGE_ACCESS_TOKEN") or self.wa_token
         self.app_secret = os.getenv("META_APP_SECRET")
         self.verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN")
         self.wa_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
@@ -142,7 +143,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
             async with httpx.AsyncClient(timeout=15) as client:
                 metadata = await client.get(
                     f"{self.graph_url}/{mensaje.media_id}",
-                    headers={"Authorization": f"Bearer {self.page_token}"},
+                    headers={"Authorization": f"Bearer {self.wa_token}"},
                 )
                 metadata.raise_for_status()
                 data = metadata.json()
@@ -154,7 +155,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
         if not media_url:
             raise ValueError("Audio sin URL descargable")
-        contenido, content_type = await self._descargar_media_meta(media_url)
+        token = self.wa_token if mensaje.canal == "whatsapp" else self.page_token
+        contenido, content_type = await self._descargar_media_meta(media_url, token)
         return contenido, (mime_type or content_type or "application/octet-stream")
 
     @staticmethod
@@ -170,9 +172,13 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         ):
             raise ValueError("URL de audio fuera de dominios Meta permitidos")
 
-    async def _descargar_media_meta(self, url: str) -> tuple[bytes, str]:
+    async def _descargar_media_meta(
+        self, url: str, token: str | None
+    ) -> tuple[bytes, str]:
         max_bytes = int(os.getenv("MAX_AUDIO_BYTES", "10485760"))
-        headers = {"Authorization": f"Bearer {self.page_token}"}
+        if not token:
+            raise ValueError("Token de Meta no configurado para descargar audio")
+        headers = {"Authorization": f"Bearer {token}"}
         actual = url
 
         async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
@@ -214,12 +220,15 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
             raise HTTPException(status_code=401, detail="Firma inválida")
 
     async def enviar_mensaje(self, destinatario: str, mensaje: str, canal: str) -> bool:
-        if not self.page_token:
-            logger.error("META_ACCESS_TOKEN no configurado")
-            return False
         if canal == "whatsapp":
+            if not self.wa_token:
+                logger.error("META_ACCESS_TOKEN no configurado")
+                return False
             return await self._enviar_whatsapp(destinatario, mensaje)
         if canal in {"instagram", "messenger"}:
+            if not self.page_token:
+                logger.error("META_PAGE_ACCESS_TOKEN no configurado")
+                return False
             return await self._enviar_graph(destinatario, mensaje, canal)
         logger.error("Canal de salida no soportado: %s", canal)
         return False
@@ -232,7 +241,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 url,
-                headers={"Authorization": f"Bearer {self.page_token}"},
+                headers={"Authorization": f"Bearer {self.wa_token}"},
                 json={
                     "messaging_product": "whatsapp",
                     "to": telefono,
@@ -259,7 +268,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 f"{self.graph_url}/{page_id}/messages",
-                params={"access_token": self.page_token},
+                headers={"Authorization": f"Bearer {self.page_token}"},
                 json=payload,
             )
             if resp.status_code != 200:

@@ -7,7 +7,8 @@ del proveedor de hosting.
 
 - Usuario con rol administrador o desarrollador en Meta Business de Escenciales.
 - App ID y App Secret de la app Meta.
-- Token de acceso de producción con los permisos aprobados para cada canal.
+- Token de usuario del sistema para WhatsApp (`META_ACCESS_TOKEN`) y token de
+  página separado para Messenger/Instagram (`META_PAGE_ACCESS_TOKEN`).
 - WhatsApp Business Account ID y Phone Number ID.
 - Número habilitado para WhatsApp Cloud API.
 - ID de la página de Facebook y de la cuenta profesional de Instagram vinculada.

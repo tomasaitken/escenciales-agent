@@ -77,6 +77,24 @@ class SeguridadWebhookTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.provider._validar_url_media("https://example.com/audio.ogg")
 
+    def test_separa_token_whatsapp_de_token_pagina(self):
+        anteriores = {
+            nombre: os.environ.get(nombre)
+            for nombre in ("META_ACCESS_TOKEN", "META_PAGE_ACCESS_TOKEN")
+        }
+        try:
+            os.environ["META_ACCESS_TOKEN"] = "token-whatsapp-prueba"
+            os.environ["META_PAGE_ACCESS_TOKEN"] = "token-pagina-prueba"
+            provider = ProveedorMetaMulticanal()
+            self.assertEqual(provider.wa_token, "token-whatsapp-prueba")
+            self.assertEqual(provider.page_token, "token-pagina-prueba")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
 
 class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
     async def test_parsea_audio_whatsapp(self):

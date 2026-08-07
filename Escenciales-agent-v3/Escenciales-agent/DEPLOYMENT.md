@@ -17,7 +17,8 @@ despacho, garantías o contacto humano sin confirmar.
    subas un `.env`.
 5. Crea un proyecto API en OpenAI y configura `OPENAI_API_KEY`. La facturación API
    es independiente de una suscripción ChatGPT.
-6. Define `ENVIRONMENT=production`, `ADMIN_PASSWORD` y un
+6. Define `ENVIRONMENT=production`, `ADMIN_PASSWORD`, `META_ACCESS_TOKEN` para
+   WhatsApp, `META_PAGE_ACCESS_TOKEN` para Messenger/Instagram y un
    `WHATSAPP_VERIFY_TOKEN` aleatorio y largo.
 7. Configura `ADMIN_PUBLIC_URL=https://TU_DOMINIO` y, opcionalmente, Telegram.
 8. Limita el acceso a logs y habilita alertas de errores.
