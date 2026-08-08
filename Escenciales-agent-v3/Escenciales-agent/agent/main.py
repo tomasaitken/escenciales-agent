@@ -2,6 +2,8 @@ import asyncio
 import os
 import logging
 import hashlib
+import re
+import unicodedata
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from fastapi import BackgroundTasks, FastAPI, Request, HTTPException
@@ -10,7 +12,12 @@ from dotenv import load_dotenv
 
 from agent.admin import router as admin_router
 from agent.audio import transcribir_audio
-from agent.brain import generar_respuesta
+from agent.brain import (
+    cargar_business_config,
+    generar_respuesta,
+    obtener_mensaje_error,
+    obtener_mensaje_fallback,
+)
 from agent.handoff import detectar_handoff, mensaje_handoff, respuesta_promete_handoff
 from agent.legal import router as legal_router
 from agent.memory import (
@@ -44,6 +51,78 @@ PORT = int(os.getenv("PORT", 8000))
 
 _fragmentos_pendientes: dict[str, list] = {}
 _version_fragmentos: dict[str, int] = {}
+
+
+def _texto_con_contexto_anuncio(texto: str, producto: str | None) -> str:
+    if not producto:
+        return texto
+    return f"[Producto identificado desde el anuncio de Meta: {producto}]\n{texto}"
+
+
+def _normalizar(texto: str) -> str:
+    texto = unicodedata.normalize("NFKD", texto)
+    return "".join(
+        caracter for caracter in texto if not unicodedata.combining(caracter)
+    ).lower()
+
+
+def _producto_desde_texto(texto: str) -> str | None:
+    texto = _normalizar(texto)
+    patrones = (
+        (r"\b(antena|tv\s*cable|television|canales?)\b", "Antena Digital Full HD 4K"),
+        (r"\b(ducha|cabezal|presion\s+de\s+agua)\b", "Cabezal de ducha"),
+        (r"\b(electroestimulador|tens|electrodos?)\b", "Electroestimulador TENS"),
+    )
+    return next(
+        (producto for patron, producto in patrones if re.search(patron, texto)),
+        None,
+    )
+
+
+def _producto_de_conversacion(
+    contexto_producto: str | None,
+    texto: str,
+    historial: list[dict],
+) -> str | None:
+    if contexto_producto:
+        return contexto_producto
+    producto = _producto_desde_texto(texto)
+    if producto:
+        return producto
+    for mensaje in reversed(historial):
+        producto = _producto_desde_texto(str(mensaje.get("content", "")))
+        if producto:
+            return producto
+    return None
+
+
+def _url_compra(producto: str | None) -> str | None:
+    if not producto:
+        return None
+    claves = {
+        "Antena Digital Full HD 4K": "antena digital full hd 4k",
+        "Cabezal de ducha": "ducha masajeadora spa pro",
+        "Electroestimulador TENS": "electroestimulador tens",
+    }
+    clave = claves.get(producto)
+    if not clave:
+        return None
+    for item in cargar_business_config().get("catalogo", []):
+        nombres = " ".join(
+            str(item.get(campo, ""))
+            for campo in ("nombre", "nombre_comercial")
+        )
+        if clave in _normalizar(nombres):
+            return item.get("url_compra")
+    return None
+
+
+def _mensaje_compra(producto: str | None, historial: list[dict]) -> str | None:
+    url = _url_compra(producto)
+    if not url or any(url in str(item.get("content", "")) for item in historial):
+        return None
+    pronombre = "lo" if producto == "Electroestimulador TENS" else "la"
+    return f"🛒 Puedes comprar{pronombre} directamente aquí:\n{url}"
 
 
 async def _esperar_fragmentos(msg):
@@ -106,7 +185,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.1.1",
+    version="3.2.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -118,7 +197,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.1.1"
+        "version": "3.2.0"
     }
 
 
@@ -151,7 +230,20 @@ async def procesar_mensajes(mensajes):
                 texto_unido = "\n".join(
                     parte.texto.strip() for parte in partes_nuevas if parte.texto.strip()
                 )
-                msg = replace(partes_nuevas[-1], texto=texto_unido, mensaje_id="")
+                contexto_producto = next(
+                    (
+                        parte.contexto_producto
+                        for parte in partes_nuevas
+                        if parte.contexto_producto
+                    ),
+                    None,
+                )
+                msg = replace(
+                    partes_nuevas[-1],
+                    texto=texto_unido,
+                    mensaje_id="",
+                    contexto_producto=contexto_producto,
+                )
                 evento_pre_registrado = True
 
             if msg.es_propio:
@@ -200,6 +292,9 @@ async def procesar_mensajes(mensajes):
                         type(exc).__name__,
                     )
                     texto_para_historial = "[Audio recibido; transcripción fallida]"
+                    texto_para_historial = _texto_con_contexto_anuncio(
+                        texto_para_historial, msg.contexto_producto
+                    )
                     await guardar_mensaje(conversacion_id, "user", texto_para_historial)
                     if await conversacion_pausada(conversacion_id):
                         continue
@@ -219,6 +314,9 @@ async def procesar_mensajes(mensajes):
                 texto_para_historial = "[Imagen recibida]"
                 if texto:
                     texto_para_historial += f" {texto}"
+                texto_para_historial = _texto_con_contexto_anuncio(
+                    texto_para_historial, msg.contexto_producto
+                )
                 await guardar_mensaje(conversacion_id, "user", texto_para_historial)
                 if await conversacion_pausada(conversacion_id):
                     logger.info("Imagen guardada en conversación pausada contacto=%s", contacto_hash)
@@ -244,6 +342,13 @@ async def procesar_mensajes(mensajes):
 
             if not texto:
                 continue
+
+            texto_para_historial = _texto_con_contexto_anuncio(
+                texto_para_historial, msg.contexto_producto
+            )
+            texto_para_modelo = _texto_con_contexto_anuncio(
+                texto, msg.contexto_producto
+            )
 
             if await conversacion_pausada(conversacion_id):
                 await guardar_mensaje(conversacion_id, "user", texto_para_historial)
@@ -271,8 +376,11 @@ async def procesar_mensajes(mensajes):
                 continue
 
             historial = await obtener_historial(conversacion_id)
+            producto_conversacion = _producto_de_conversacion(
+                msg.contexto_producto, texto, historial
+            )
             respuesta = await generar_respuesta(
-                texto,
+                texto_para_modelo,
                 historial,
                 canal=msg.canal,
                 safety_identifier=f"esc_{hash_completo[:32]}",
@@ -297,6 +405,25 @@ async def procesar_mensajes(mensajes):
             )
             if not enviado:
                 logger.error("No se pudo enviar respuesta contacto=%s", contacto_hash)
+            respuesta_tecnica = respuesta in {
+                obtener_mensaje_error(),
+                obtener_mensaje_fallback(),
+            }
+            if enviado and not ticket_modelo and not respuesta_tecnica:
+                mensaje_compra = _mensaje_compra(producto_conversacion, historial)
+                if mensaje_compra:
+                    enlace_enviado = await proveedor.enviar_mensaje(
+                        msg.telefono, mensaje_compra, canal=msg.canal
+                    )
+                    if enlace_enviado:
+                        await guardar_mensaje(
+                            conversacion_id, "assistant", mensaje_compra
+                        )
+                    else:
+                        logger.error(
+                            "No se pudo enviar enlace de compra contacto=%s",
+                            contacto_hash,
+                        )
             if ticket_modelo:
                 await notificar_handoff(
                     ticket_modelo["id"], msg.canal, "escalamiento_modelo"

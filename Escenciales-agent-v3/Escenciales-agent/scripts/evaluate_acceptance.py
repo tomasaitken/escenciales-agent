@@ -18,6 +18,13 @@ from agent.handoff import detectar_handoff, mensaje_handoff
 
 ESCENARIOS = (
     (
+        "anuncio_facebook_antena_mensaje_generico",
+        "[Producto identificado desde el anuncio de Meta: "
+        "Antena Digital Full HD 4K]\n"
+        "Hello! Can I get more info on this?\nHola",
+        [],
+    ),
+    (
         "texto_muy_simple_antena",
         "ola kiero la antena cuanto sale y como la compro no entiendo muxo",
         [],

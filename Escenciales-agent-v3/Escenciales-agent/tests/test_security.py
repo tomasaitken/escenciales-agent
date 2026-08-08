@@ -260,6 +260,10 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
                 "entry": [{"messaging": [{
                     "sender": {"id": "cliente-instagram"},
                     "recipient": {"id": "cuenta-instagram-directa"},
+                    "referral": {
+                        "source": "ADS",
+                        "headline": "Cabezal de ducha con filtro",
+                    },
                     "message": {
                         "mid": "mensaje-instagram-directo-1",
                         "text": "¿Dónde están ubicados?",
@@ -278,6 +282,7 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(mensajes[0].canal, "instagram")
             self.assertEqual(mensajes[0].telefono, "cliente-instagram")
             self.assertEqual(mensajes[0].texto, "¿Dónde están ubicados?")
+            self.assertEqual(mensajes[0].contexto_producto, "Cabezal de ducha")
         finally:
             for nombre, valor in anteriores.items():
                 if valor is None:
@@ -312,6 +317,49 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(mensajes), 1)
             self.assertEqual(mensajes[0].tipo, "audio")
             self.assertEqual(mensajes[0].media_id, "media-1")
+        finally:
+            if anterior is None:
+                os.environ.pop("META_APP_SECRET", None)
+            else:
+                os.environ["META_APP_SECRET"] = anterior
+
+    async def test_identifica_producto_desde_anuncio_click_a_whatsapp(self):
+        anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{
+                    "changes": [{
+                        "field": "messages",
+                        "value": {"messages": [{
+                            "from": "56911111111",
+                            "id": "wamid.ad-1",
+                            "type": "text",
+                            "text": {"body": "Hello! Can I get more info on this?"},
+                            "referral": {
+                                "source_type": "ad",
+                                "source_url": "https://fb.me/anuncio",
+                                "headline": "¿Sigues pagando TV cable?",
+                                "body": "Antena Digital Full HD 4K",
+                            },
+                        }]},
+                    }],
+                }],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertEqual(
+                mensajes[0].contexto_producto,
+                "Antena Digital Full HD 4K",
+            )
         finally:
             if anterior is None:
                 os.environ.pop("META_APP_SECRET", None)

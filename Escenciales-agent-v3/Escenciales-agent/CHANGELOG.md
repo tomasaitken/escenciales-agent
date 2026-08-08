@@ -1,5 +1,18 @@
 # Cambios
 
+## 3.2.0 — 2026-08-08
+
+- Reconocimiento del producto desde el contexto de anuncios de Meta en WhatsApp,
+  Messenger e Instagram.
+- Las consultas genéricas provenientes de un anuncio responden directamente sobre
+  Antena HD, Cabezal de ducha o TENS, sin volver a preguntar qué producto interesa.
+- El contexto del anuncio se conserva al agrupar mensajes consecutivos.
+- Tono con un emoji cálido ocasional, limitado a uno por mensaje y excluido de temas
+  sensibles.
+- Enlace oficial de compra enviado como segundo mensaje breve, una sola vez por
+  producto y conversación, sin duplicarlo dentro de la explicación.
+- Pruebas automatizadas y evaluación real del caso observado en producción.
+
 ## 3.0.0 — 2026-08-04
 
 - Migración de Anthropic a OpenAI Responses API.

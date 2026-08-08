@@ -21,6 +21,8 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("lugar sin obstáculos", prompt)
         self.assertIn("El envío es gratis", prompt)
         self.assertIn("al momento de recibir el producto", prompt)
+        self.assertIn("emoji cálido", prompt)
+        self.assertIn("Máximo uno por mensaje", prompt)
 
     def test_prompt_no_expone_direccion_y_fija_ubicacion_aprobada(self):
         prompt = cargar_system_prompt("instagram")
@@ -39,6 +41,11 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No menciones, enumeres, recomiendes, compares ni ofrezcas", prompt)
         self.assertIn("Solo puedes hablar de otros productos si el cliente pide", prompt)
         self.assertIn("No hagas venta cruzada", prompt)
+        self.assertIn("Producto identificado desde el anuncio", prompt)
+        self.assertIn("nunca preguntes cuál le interesa", prompt)
+        self.assertIn("No menciones la marca interna", prompt)
+        self.assertIn("ENLACE DE COMPRA EN SEGUNDO MENSAJE", prompt)
+        self.assertIn("no incluyas ninguna URL", prompt)
 
     def test_prompt_incorpora_respuestas_probadas_sin_volverse_guion(self):
         prompt = cargar_system_prompt("whatsapp")

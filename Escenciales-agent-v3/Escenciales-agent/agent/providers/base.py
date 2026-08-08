@@ -15,6 +15,7 @@ class MensajeEntrante:
     media_id: str | None = field(default=None)
     media_url: str | None = field(default=None)
     mime_type: str | None = field(default=None)
+    contexto_producto: str | None = field(default=None)
 
 
 class ProveedorWhatsApp(ABC):
