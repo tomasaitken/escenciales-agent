@@ -31,6 +31,15 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('en Santiago de Chile"', prompt)
         self.assertIn("envíos a todo Chile y también al extranjero", prompt)
 
+    def test_prompt_mantiene_foco_en_el_producto_consultado(self):
+        prompt = cargar_system_prompt("messenger")
+
+        self.assertIn("FOCO EN EL PRODUCTO — REGLA OBLIGATORIA", prompt)
+        self.assertIn("responde exclusivamente", prompt)
+        self.assertIn("No menciones, enumeres, recomiendes, compares ni ofrezcas", prompt)
+        self.assertIn("Solo puedes hablar de otros productos si el cliente pide", prompt)
+        self.assertIn("No hagas venta cruzada", prompt)
+
     def test_bloquea_direccion_exacta_en_la_salida(self):
         respuesta = sanitizar_respuesta(
             "Estamos en calle Juan XXIII 5560, Santiago."
