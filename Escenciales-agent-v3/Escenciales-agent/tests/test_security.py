@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import unittest
+from unittest.mock import patch
 
 from fastapi import HTTPException, Request
 
@@ -88,6 +89,87 @@ class SeguridadWebhookTests(unittest.TestCase):
             provider = ProveedorMetaMulticanal()
             self.assertEqual(provider.wa_token, "token-whatsapp-prueba")
             self.assertEqual(provider.page_token, "token-pagina-prueba")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
+    def test_separa_token_directo_de_instagram(self):
+        nombres = (
+            "META_PAGE_ACCESS_TOKEN",
+            "META_INSTAGRAM_ACCESS_TOKEN",
+            "META_INSTAGRAM_ACCOUNT_ID",
+        )
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        try:
+            os.environ["META_PAGE_ACCESS_TOKEN"] = "token-pagina-prueba"
+            os.environ["META_INSTAGRAM_ACCESS_TOKEN"] = "token-instagram-prueba"
+            os.environ["META_INSTAGRAM_ACCOUNT_ID"] = "cuenta-instagram-prueba"
+            provider = ProveedorMetaMulticanal()
+            self.assertEqual(provider.page_token, "token-pagina-prueba")
+            self.assertEqual(provider.instagram_token, "token-instagram-prueba")
+            self.assertEqual(provider.ig_account_id, "cuenta-instagram-prueba")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
+
+class EnvioInstagramTests(unittest.IsolatedAsyncioTestCase):
+    async def test_instagram_usa_graph_instagram_y_token_directo(self):
+        nombres = (
+            "META_PAGE_ACCESS_TOKEN",
+            "META_INSTAGRAM_ACCESS_TOKEN",
+            "META_INSTAGRAM_ACCOUNT_ID",
+        )
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        os.environ["META_PAGE_ACCESS_TOKEN"] = "token-pagina-prueba"
+        os.environ["META_INSTAGRAM_ACCESS_TOKEN"] = "token-instagram-prueba"
+        os.environ["META_INSTAGRAM_ACCOUNT_ID"] = "cuenta-instagram-prueba"
+        solicitudes = []
+
+        class Respuesta:
+            status_code = 200
+
+        class ClienteFalso:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def post(self, url, headers, json):
+                solicitudes.append((url, headers, json))
+                return Respuesta()
+
+        try:
+            provider = ProveedorMetaMulticanal()
+            with patch(
+                "agent.providers.meta_multichannel.httpx.AsyncClient",
+                ClienteFalso,
+            ):
+                enviado = await provider.enviar_mensaje(
+                    "cliente-instagram", "Hola", "instagram"
+                )
+            self.assertTrue(enviado)
+            self.assertEqual(len(solicitudes), 1)
+            url, headers, payload = solicitudes[0]
+            self.assertEqual(
+                url,
+                "https://graph.instagram.com/v25.0/cuenta-instagram-prueba/messages",
+            )
+            self.assertEqual(
+                headers["Authorization"], "Bearer token-instagram-prueba"
+            )
+            self.assertEqual(payload["recipient"]["id"], "cliente-instagram")
+            self.assertNotIn("messaging_type", payload)
         finally:
             for nombre, valor in anteriores.items():
                 if valor is None:

@@ -17,13 +17,16 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         self.app_id = os.getenv("META_APP_ID")
         self.wa_token = os.getenv("META_ACCESS_TOKEN")
         self.page_token = os.getenv("META_PAGE_ACCESS_TOKEN") or self.wa_token
+        self.instagram_token = os.getenv("META_INSTAGRAM_ACCESS_TOKEN")
         self.app_secret = os.getenv("META_APP_SECRET")
         self.verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN")
         self.wa_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
         self.ig_page_id = os.getenv("IG_PAGE_ID")
+        self.ig_account_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID")
         self.fb_page_id = os.getenv("FB_PAGE_ID")
         self.graph_version = os.getenv("META_GRAPH_API_VERSION", "v25.0")
         self.graph_url = f"https://graph.facebook.com/{self.graph_version}"
+        self.instagram_graph_url = f"https://graph.instagram.com/{self.graph_version}"
 
     async def validar_webhook(self, request: Request):
         params = request.query_params
@@ -249,7 +252,12 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 logger.error("META_ACCESS_TOKEN no configurado")
                 return False
             return await self._enviar_whatsapp(destinatario, mensaje)
-        if canal in {"instagram", "messenger"}:
+        if canal == "instagram":
+            if not self.instagram_token:
+                logger.error("META_INSTAGRAM_ACCESS_TOKEN no configurado")
+                return False
+            return await self._enviar_graph(destinatario, mensaje, canal)
+        if canal == "messenger":
             if not self.page_token:
                 logger.error("META_PAGE_ACCESS_TOKEN no configurado")
                 return False
@@ -279,7 +287,14 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
             return True
 
     async def _enviar_graph(self, recipient_id: str, texto: str, canal: str) -> bool:
-        page_id = self.ig_page_id if canal == "instagram" else self.fb_page_id
+        if canal == "instagram":
+            page_id = self.ig_account_id
+            token = self.instagram_token
+            graph_url = self.instagram_graph_url
+        else:
+            page_id = self.fb_page_id
+            token = self.page_token
+            graph_url = self.graph_url
         if not page_id:
             logger.error("ID de página no configurado para %s", canal)
             return False
@@ -291,8 +306,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
             payload["messaging_type"] = "RESPONSE"
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
-                f"{self.graph_url}/{page_id}/messages",
-                headers={"Authorization": f"Bearer {self.page_token}"},
+                f"{graph_url}/{page_id}/messages",
+                headers={"Authorization": f"Bearer {token}"},
                 json=payload,
             )
             if resp.status_code != 200:
