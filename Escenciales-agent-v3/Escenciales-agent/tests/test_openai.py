@@ -65,6 +65,20 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("todo Chile", respuesta)
         self.assertIn("extranjero", respuesta)
 
+    def test_prompt_adapta_respuesta_a_baja_alfabetizacion(self):
+        prompt = cargar_system_prompt("whatsapp")
+
+        self.assertIn("CLIENTES QUE NECESITAN MÁXIMA SIMPLICIDAD", prompt)
+        self.assertIn("Nunca corrijas, ridiculices", prompt)
+        self.assertIn("una sola acción por vez", prompt)
+        self.assertIn("Escribe solamente en español", prompt)
+
+    def test_elimina_escritura_no_latina_accidental(self):
+        respuesta = sanitizar_respuesta("Aprieta el botón; հետո completas tus datos.")
+
+        self.assertNotIn("հետո", respuesta)
+        self.assertIn("completas tus datos", respuesta)
+
     async def test_usa_responses_api_y_modelo_configurado(self):
         async def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.url.path, "/v1/responses")

@@ -318,6 +318,91 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             else:
                 os.environ["META_APP_SECRET"] = anterior
 
+    async def test_parsea_imagen_whatsapp_con_descripcion(self):
+        anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{
+                    "changes": [{
+                        "field": "messages",
+                        "value": {"messages": [{
+                            "from": "56911111111",
+                            "id": "wamid.image-1",
+                            "type": "image",
+                            "image": {
+                                "id": "media-image-1",
+                                "mime_type": "image/jpeg",
+                                "caption": "¿Esta conexión sirve?",
+                            },
+                        }]},
+                    }],
+                }],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertEqual(mensajes[0].tipo, "image")
+            self.assertEqual(mensajes[0].media_id, "media-image-1")
+            self.assertEqual(mensajes[0].texto, "¿Esta conexión sirve?")
+        finally:
+            if anterior is None:
+                os.environ.pop("META_APP_SECRET", None)
+            else:
+                os.environ["META_APP_SECRET"] = anterior
+
+    async def test_parsea_imagen_instagram_sin_duplicar_el_texto(self):
+        nombres = (
+            "META_APP_SECRET", "META_INSTAGRAM_ACCOUNT_ID", "IG_PAGE_ID"
+        )
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        os.environ["META_INSTAGRAM_ACCOUNT_ID"] = "cuenta-instagram"
+        os.environ["IG_PAGE_ID"] = "pagina-instagram"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{"messaging": [{
+                    "sender": {"id": "cliente-instagram"},
+                    "recipient": {"id": "cuenta-instagram"},
+                    "message": {
+                        "mid": "ig-image-1",
+                        "text": "¿Me sirve esta conexión?",
+                        "attachments": [{
+                            "type": "image",
+                            "payload": {
+                                "url": "https://lookaside.fbsbx.com/imagen.jpg"
+                            },
+                        }],
+                    },
+                }]}],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertEqual(mensajes[0].tipo, "image")
+            self.assertEqual(mensajes[0].canal, "instagram")
+            self.assertEqual(mensajes[0].texto, "¿Me sirve esta conexión?")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
     async def test_parsea_respuesta_manual_de_messenger_y_omite_echo_del_bot(self):
         nombres = (
             "META_APP_SECRET", "META_APP_ID", "META_INSTAGRAM_APP_ID", "FB_PAGE_ID"

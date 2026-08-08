@@ -1,7 +1,9 @@
+import asyncio
 import os
 import logging
 import hashlib
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from fastapi import BackgroundTasks, FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -9,7 +11,7 @@ from dotenv import load_dotenv
 from agent.admin import router as admin_router
 from agent.audio import transcribir_audio
 from agent.brain import generar_respuesta
-from agent.handoff import detectar_handoff, mensaje_handoff
+from agent.handoff import detectar_handoff, mensaje_handoff, respuesta_promete_handoff
 from agent.legal import router as legal_router
 from agent.memory import (
     conversacion_pausada,
@@ -39,6 +41,29 @@ logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
 
 proveedor = obtener_proveedor()
 PORT = int(os.getenv("PORT", 8000))
+
+_fragmentos_pendientes: dict[str, list] = {}
+_version_fragmentos: dict[str, int] = {}
+
+
+async def _esperar_fragmentos(msg):
+    """Agrupa textos consecutivos del mismo contacto antes de responder."""
+    espera = max(0.0, float(os.getenv("MESSAGE_DEBOUNCE_SECONDS", "3")))
+    if espera == 0 or msg.es_propio or msg.tipo != "text":
+        return [msg]
+
+    clave = f"{msg.canal}:{msg.telefono}"
+    lote = _fragmentos_pendientes.setdefault(clave, [])
+    lote.append(msg)
+    version = _version_fragmentos.get(clave, 0) + 1
+    _version_fragmentos[clave] = version
+
+    await asyncio.sleep(espera)
+    if _version_fragmentos.get(clave) != version:
+        return []
+
+    _version_fragmentos.pop(clave, None)
+    return _fragmentos_pendientes.pop(clave, [])
 
 
 @asynccontextmanager
@@ -79,7 +104,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.0.0",
+    version="3.1.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -91,7 +116,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.0.0"
+        "version": "3.1.0"
     }
 
 
@@ -104,8 +129,29 @@ async def webhook_verificacion(request: Request):
 
 
 async def procesar_mensajes(mensajes):
+    if len(mensajes) > 1:
+        await asyncio.gather(*(procesar_mensajes([msg]) for msg in mensajes))
+        return
     for msg in mensajes:
         try:
+            evento_pre_registrado = False
+            if not msg.es_propio and msg.tipo == "text":
+                lote = await _esperar_fragmentos(msg)
+                if not lote:
+                    continue
+                partes_nuevas = []
+                for parte in lote:
+                    if await registrar_evento_si_nuevo(parte.mensaje_id):
+                        partes_nuevas.append(parte)
+                if not partes_nuevas:
+                    logger.info("Webhook duplicado ignorado")
+                    continue
+                texto_unido = "\n".join(
+                    parte.texto.strip() for parte in partes_nuevas if parte.texto.strip()
+                )
+                msg = replace(partes_nuevas[-1], texto=texto_unido, mensaje_id="")
+                evento_pre_registrado = True
+
             if msg.es_propio:
                 if not msg.telefono:
                     continue
@@ -129,7 +175,7 @@ async def procesar_mensajes(mensajes):
                     contacto_hash,
                 )
                 continue
-            if not await registrar_evento_si_nuevo(msg.mensaje_id):
+            if not evento_pre_registrado and not await registrar_evento_si_nuevo(msg.mensaje_id):
                 logger.info("Webhook duplicado ignorado")
                 continue
 
@@ -167,6 +213,30 @@ async def procesar_mensajes(mensajes):
                     await proveedor.enviar_mensaje(msg.telefono, respuesta, canal=msg.canal)
                     await notificar_handoff(ticket["id"], msg.canal, "audio_no_procesado")
                     continue
+            elif msg.tipo == "image":
+                texto_para_historial = "[Imagen recibida]"
+                if texto:
+                    texto_para_historial += f" {texto}"
+                await guardar_mensaje(conversacion_id, "user", texto_para_historial)
+                if await conversacion_pausada(conversacion_id):
+                    logger.info("Imagen guardada en conversación pausada contacto=%s", contacto_hash)
+                    continue
+                respuesta = (
+                    "Gracias, recibí la foto. La dejaré pendiente para que una persona "
+                    "del equipo la revise y continúe contigo por aquí."
+                )
+                ticket = await crear_handoff(
+                    conversacion_id, msg.canal, msg.telefono,
+                    "imagen_para_revision", texto_para_historial,
+                )
+                await guardar_mensaje(conversacion_id, "assistant", respuesta)
+                enviado = await proveedor.enviar_mensaje(
+                    msg.telefono, respuesta, canal=msg.canal
+                )
+                if not enviado:
+                    logger.error("No se pudo enviar handoff de imagen contacto=%s", contacto_hash)
+                await notificar_handoff(ticket["id"], msg.canal, "imagen_para_revision")
+                continue
             else:
                 texto_para_historial = texto
 
@@ -206,6 +276,17 @@ async def procesar_mensajes(mensajes):
                 safety_identifier=f"esc_{hash_completo[:32]}",
             )
 
+            ticket_modelo = None
+            if respuesta_promete_handoff(respuesta):
+                ticket_modelo = await crear_handoff(
+                    conversacion_id,
+                    msg.canal,
+                    msg.telefono,
+                    "escalamiento_modelo",
+                    texto_para_historial,
+                )
+                logger.info("Promesa de apoyo humano convertida en handoff contacto=%s", contacto_hash)
+
             await guardar_mensaje(conversacion_id, "user", texto_para_historial)
             await guardar_mensaje(conversacion_id, "assistant", respuesta)
 
@@ -214,6 +295,10 @@ async def procesar_mensajes(mensajes):
             )
             if not enviado:
                 logger.error("No se pudo enviar respuesta contacto=%s", contacto_hash)
+            if ticket_modelo:
+                await notificar_handoff(
+                    ticket_modelo["id"], msg.canal, "escalamiento_modelo"
+                )
         except Exception:
             logger.exception("Error procesando mensaje individual")
 

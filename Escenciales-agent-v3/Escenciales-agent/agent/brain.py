@@ -27,6 +27,10 @@ PATRONES_DIRECCION_NO_PUBLICABLE = (
     re.compile(r"\b5560\b"),
 )
 
+PATRON_ESCRITURA_NO_LATINA = re.compile(
+    "[\u0400-\u052f\u0530-\u058f\u0590-\u08ff\u3040-\u30ff\u3400-\u9fff]"
+)
+
 
 def cargar_prompts_config() -> dict:
     try:
@@ -59,7 +63,11 @@ def sanitizar_respuesta(respuesta: str) -> str:
     if any(patron.search(respuesta) for patron in PATRONES_DIRECCION_NO_PUBLICABLE):
         logger.warning("Se bloqueó una dirección exacta en la respuesta del agente")
         return RESPUESTA_UBICACION_SEGURA
-    return respuesta
+    if PATRON_ESCRITURA_NO_LATINA.search(respuesta):
+        logger.warning("Se eliminó escritura no latina de la respuesta del agente")
+        respuesta = PATRON_ESCRITURA_NO_LATINA.sub("", respuesta)
+        respuesta = re.sub(r"[ \t]{2,}", " ", respuesta)
+    return respuesta.strip()
 
 
 def cargar_system_prompt(canal: str = "whatsapp") -> str:

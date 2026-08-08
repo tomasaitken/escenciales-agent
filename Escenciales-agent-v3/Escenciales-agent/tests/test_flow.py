@@ -1,3 +1,4 @@
+import asyncio
 import os
 import unittest
 import uuid
@@ -5,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
+os.environ["MESSAGE_DEBOUNCE_SECONDS"] = "0"
 
 from agent import main  # noqa: E402
 from agent.memory import (  # noqa: E402
@@ -100,6 +102,104 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             pendientes = await listar_handoffs("pendiente")
             ticket = next(t for t in pendientes if t["conversacion_id"] == conversacion)
             self.assertEqual(ticket["motivo"], "operador_manual")
+
+    async def test_imagen_se_deriva_y_pausa_sin_intentar_interpretarla(self):
+        contacto = "ig-" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        imagen = MensajeEntrante(
+            telefono=contacto,
+            texto="Esta conexión sirve?",
+            mensaje_id="img-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="instagram",
+            tipo="image",
+            media_url="https://lookaside.fbsbx.com/imagen.jpg",
+        )
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "notificar_handoff", AsyncMock()
+        ):
+            await main.procesar_mensajes([imagen])
+
+        self.assertEqual(len(proveedor.enviados), 1)
+        self.assertIn("recibí la foto", proveedor.enviados[0][1])
+        self.assertTrue(await conversacion_pausada(f"instagram:{contacto}"))
+
+    async def test_promesa_del_modelo_crea_handoff_real(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        mensaje = MensajeEntrante(
+            telefono=contacto,
+            texto="No estoy seguro de la conexión",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+        )
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "generar_respuesta", AsyncMock(
+                return_value="Una persona del equipo revisará esto contigo."
+            )
+        ), patch.object(main, "notificar_handoff", AsyncMock()):
+            await main.procesar_mensajes([mensaje])
+
+        self.assertEqual(len(proveedor.enviados), 1)
+        self.assertTrue(await conversacion_pausada(f"whatsapp:{contacto}"))
+
+    async def test_fragmentos_consecutivos_generan_una_sola_respuesta(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        primero = MensajeEntrante(
+            telefono=contacto,
+            texto="ola",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+        )
+        segundo = MensajeEntrante(
+            telefono=contacto,
+            texto="kiero la antena",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+        )
+        generar = AsyncMock(return_value="La antena cuesta $22.990.")
+
+        with patch.dict(os.environ, {"MESSAGE_DEBOUNCE_SECONDS": "0.05"}), patch.object(
+            main, "proveedor", proveedor
+        ), patch.object(main, "generar_respuesta", generar):
+            tarea_1 = asyncio.create_task(main.procesar_mensajes([primero]))
+            await asyncio.sleep(0.01)
+            tarea_2 = asyncio.create_task(main.procesar_mensajes([segundo]))
+            await asyncio.gather(tarea_1, tarea_2)
+
+        self.assertEqual(len(proveedor.enviados), 1)
+        self.assertEqual(generar.await_count, 1)
+        self.assertEqual(generar.await_args.args[0], "ola\nkiero la antena")
+
+    async def test_fragmentos_en_un_mismo_webhook_tambien_se_agrupan(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        mensajes = [
+            MensajeEntrante(
+                telefono=contacto,
+                texto=texto,
+                mensaje_id="msg-" + uuid.uuid4().hex,
+                es_propio=False,
+                canal="messenger",
+            )
+            for texto in ("hola", "kiero", "la antena")
+        ]
+        generar = AsyncMock(return_value="La antena cuesta $22.990.")
+
+        with patch.dict(os.environ, {"MESSAGE_DEBOUNCE_SECONDS": "0.05"}), patch.object(
+            main, "proveedor", proveedor
+        ), patch.object(main, "generar_respuesta", generar):
+            await main.procesar_mensajes(mensajes)
+
+        self.assertEqual(len(proveedor.enviados), 1)
+        self.assertEqual(generar.await_count, 1)
+        self.assertEqual(generar.await_args.args[0], "hola\nkiero\nla antena")
 
 
 if __name__ == "__main__":

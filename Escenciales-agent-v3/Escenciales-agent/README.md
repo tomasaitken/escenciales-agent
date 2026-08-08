@@ -15,6 +15,8 @@ continuar la conversación.
 - Historial, deduplicación y retención: implementados.
 - OpenAI Responses API (`gpt-5.6-terra` por defecto): implementada.
 - Audios Meta → `gpt-transcribe`: implementados.
+- Fotos y capturas: se reciben, se confirman y se derivan al equipo humano.
+- Mensajes cortos consecutivos: se agrupan durante unos segundos para responder una sola vez.
 - Cola humana y panel `/admin`: implementados.
 - Checkout contraentrega existente: el agente dirige al formulario Releasit COD de
   cada producto, que crea el pedido en Shopify.

@@ -104,6 +104,18 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                             media_id=audio.get("id"),
                             mime_type=audio.get("mime_type"),
                         ))
+                    elif msg.get("type") == "image":
+                        imagen = msg.get("image", {})
+                        mensajes.append(MensajeEntrante(
+                            telefono=msg["from"],
+                            texto=imagen.get("caption", ""),
+                            mensaje_id=msg["id"],
+                            es_propio=False,
+                            canal="whatsapp",
+                            tipo="image",
+                            media_id=imagen.get("id"),
+                            mime_type=imagen.get("mime_type"),
+                        ))
 
             for messaging in entry.get("messaging", []):
                 sender_id = messaging.get("sender", {}).get("id", "")
@@ -156,7 +168,22 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                     canal = "messenger"
 
                 texto = msg.get("text", "")
-                if texto:
+                attachments = msg.get("attachments", [])
+                imagen = next(
+                    (adjunto for adjunto in attachments if adjunto.get("type") == "image"),
+                    None,
+                )
+                if imagen:
+                    mensajes.append(MensajeEntrante(
+                        telefono=sender_id,
+                        texto=texto,
+                        mensaje_id=msg.get("mid", ""),
+                        es_propio=False,
+                        canal=canal,
+                        tipo="image",
+                        media_url=imagen.get("payload", {}).get("url"),
+                    ))
+                elif texto:
                     mensajes.append(MensajeEntrante(
                         telefono=sender_id,
                         texto=texto,
@@ -165,7 +192,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                         canal=canal,
                     ))
 
-                for indice, attachment in enumerate(msg.get("attachments", [])):
+                for indice, attachment in enumerate(attachments):
                     if attachment.get("type") != "audio":
                         continue
                     payload = attachment.get("payload", {})
