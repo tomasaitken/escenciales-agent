@@ -47,7 +47,8 @@ venta:
       equipo para confirmar costo, plazo y forma de pago. El envío gratis y el pago
       contraentrega solo se informan para Chile, salvo confirmación humana distinta.
     plazo_santiago: "1 a 3 días"
-    plazo_regiones: "2 a 5 días"
+    plazo_regiones: "3 a 5 días"
+    fuente_plazos: "Confirmados por la propietaria a partir de su atención comercial."
     regla_plazo: "Es un plazo publicado, no una garantía. No dice si son días hábiles."
     regiones_disponibles_en_formulario:
       - Coquimbo
@@ -109,6 +110,7 @@ catalogo:
     nombre_comercial: "Electroestimulador TENS de 4 Electrodos"
     tipo: "Salud"
     url: "https://chilessentials.cl/products/maquina-electroestimulador"
+    url_compra: "https://chilessentials.cl/products/maquina-electroestimulador?variant=54012229452144"
     precio_clp: 29990
     precio_antes_clp: 33990
     disponible_publicado: true
@@ -142,6 +144,7 @@ catalogo:
     nombre: "Ducha Masajeadora Spa Pro"
     tipo: "Salud"
     url: "https://chilessentials.cl/products/%F0%9F%94%A5-cabezal-ducha-masajeadora-spa"
+    url_compra: "https://chilessentials.cl/products/%F0%9F%94%A5-cabezal-ducha-masajeadora-spa?variant=53942908322160"
     precio_clp: 23990
     precio_antes_clp: 27990
     disponible_publicado: true
@@ -158,7 +161,14 @@ catalogo:
       descuento_total_clp: 10000
       total_estimado_clp: 37980
       regla: "Confirmar que la oferta siga visible antes de prometerla."
-    compatibilidad: "[PENDIENTE_TIPO_DE_CONEXION_Y_MEDIDAS]"
+    compatibilidad_declarada_por_propietaria: >
+      Se adapta a la gran mayoría de las duchas que utilizan conexión estándar,
+      que es la más común en Chile.
+    regla_compatibilidad: >
+      Presentarlo como compatibilidad general, no universal. Si el cliente tiene
+      una conexión especial, medidas distintas o no sabe qué conexión utiliza,
+      solicitar una foto o medida para revisión humana antes de asegurar que sirve.
+    filtro: "[NO CONFIRMADO: la página oficial actual no publica que incluya filtro.]"
     contenido_paquete: "[PENDIENTE]"
     garantia: "[PENDIENTE_POLITICA]"
 
@@ -168,6 +178,7 @@ catalogo:
     nombre: "Antena Digital Full HD 4K"
     tipo: "Hogar"
     url: "https://chilessentials.cl/products/m-antena-digital-full-hd-4k-caja"
+    url_compra: "https://chilessentials.cl/products/m-antena-digital-full-hd-4k-caja?variant=53910086058352"
     precio_clp: 22990
     precio_antes_clp: 29990
     disponible_publicado: true
@@ -183,6 +194,21 @@ catalogo:
       No garantizar cantidad de canales, señal, calidad ni alcance. Para favorecer
       la recepción, instalar la antena en un lugar sin obstáculos. La señal también
       depende de la ubicación, la cobertura local y el televisor.
+    canales_abiertos_posibles:
+      - TVN
+      - Mega
+      - Chilevisión
+      - Canal 13
+      - TV+
+      - La Red
+      - otros canales digitales abiertos disponibles localmente
+    regla_canales: >
+      Mencionar estos canales solo como ejemplos posibles en sectores donde estén
+      disponibles. Nunca asegurar que recibirá todos ni una cantidad determinada.
+    zonas_rurales: >
+      Puede funcionar en zonas rurales cuando existe cobertura de televisión digital
+      terrestre en el sector. La recepción mejora con una señal disponible y una
+      ubicación despejada, pero debe probarse y no puede garantizarse por comuna.
     oferta_cantidad:
       cantidad: 2
       descuento_total_clp: 10000
@@ -214,6 +240,34 @@ objeciones:
   cobertura: >
     Informar envíos a todo Chile y al extranjero. Si el formulario no muestra la
     región o el destino es internacional, escalar para confirmar las condiciones.
+
+guia_atencion_validada_por_propietaria:
+  proposito: >
+    Estas pautas provienen de respuestas manuales que han funcionado con clientes.
+    Deben orientar el contenido y el orden de la respuesta, no copiarse literalmente.
+  precio_producto: >
+    Dar el precio vigente del producto consultado, explicar que el envío es gratis
+    en Chile y que se paga al recibir. Hacer como máximo una pregunta breve que sea
+    útil para ese mismo producto.
+  compra_por_web: >
+    Enviar únicamente el enlace de compra del producto consultado. Explicar en
+    lenguaje simple: abrir el enlace, pulsar "PAGA Contra ENTREGA", completar el
+    formulario y pulsar "Completa tu Compra". No afirmar que el pedido quedó creado
+    sin confirmación del sistema.
+  ayuda_formulario: >
+    Ofrecer ayuda para completar el formulario. Si el cliente no puede hacerlo o
+    pide que el equipo ingrese el pedido, activar el flujo de pedido asistido.
+  ubicacion_y_despacho: >
+    Decir que la tienda está en Santiago y despacha gratis a todo Chile. Preguntar
+    comuna solo cuando sirva para orientar el despacho o la instalación del producto.
+  cobertura_antena: >
+    Explicar que canales y recepción dependen de la cobertura digital terrestre de
+    la ubicación. Puede pedirse comuna o localidad para entender el contexto, pero
+    no prometer una comprobación ni confirmar señal sin una fuente real.
+  seguimiento_proactivo: >
+    No enviar seguimientos por iniciativa propia ni decir "vi que nos consultaste
+    hace unos días". Ese tipo de mensaje requiere un flujo separado, consentimiento,
+    historial comprobado y cumplimiento de las reglas de Meta.
 
 handoff:
   contacto: "Equipo ESENCIALES"

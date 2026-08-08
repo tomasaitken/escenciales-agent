@@ -40,6 +40,20 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Solo puedes hablar de otros productos si el cliente pide", prompt)
         self.assertIn("No hagas venta cruzada", prompt)
 
+    def test_prompt_incorpora_respuestas_probadas_sin_volverse_guion(self):
+        prompt = cargar_system_prompt("whatsapp")
+
+        self.assertIn("PATRONES COMERCIALES VALIDADOS POR EL EQUIPO", prompt)
+        self.assertIn("nunca como respuestas predeterminadas", prompt)
+        self.assertIn("3 a 5 días", prompt)
+        self.assertIn("url_compra", prompt)
+        self.assertIn("TVN", prompt)
+        self.assertIn("zonas rurales", prompt)
+        self.assertIn("conexión estándar", prompt)
+        self.assertIn("NO CONFIRMADO", prompt)
+        self.assertIn("No envíes seguimientos proactivos", prompt)
+        self.assertIn("no prometer una comprobación", prompt)
+
     def test_bloquea_direccion_exacta_en_la_salida(self):
         respuesta = sanitizar_respuesta(
             "Estamos en calle Juan XXIII 5560, Santiago."
