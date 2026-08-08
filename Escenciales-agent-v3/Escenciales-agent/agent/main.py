@@ -10,6 +10,7 @@ from agent.admin import router as admin_router
 from agent.audio import transcribir_audio
 from agent.brain import generar_respuesta
 from agent.handoff import detectar_handoff, mensaje_handoff
+from agent.legal import router as legal_router
 from agent.memory import (
     conversacion_pausada,
     crear_handoff,
@@ -82,6 +83,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 app.include_router(admin_router)
+app.include_router(legal_router)
 
 
 @app.get("/")
