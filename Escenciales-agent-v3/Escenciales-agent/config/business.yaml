@@ -13,7 +13,11 @@ negocio:
   dominio_shopify_publico: "01ix5u-wa.myshopify.com"
   email: "contacto@chilessentials.cl"
   telefono: "+56 9 3866 3898"
-  direccion_publicada_privacidad: "Juan XXIII 5560, 33, Santiago RM, Chile"
+  ubicacion_para_clientes: "Santiago de Chile"
+  regla_ubicacion: >
+    Si preguntan dónde está ubicada la tienda, responde únicamente que está ubicada
+    en Santiago de Chile. Nunca entregues ni confirmes calle, numeración, departamento,
+    comuna específica ni dirección legal o administrativa.
   fuente: "Sitio público chilessentials.cl"
   verificado_el: "2026-08-04"
 
@@ -37,6 +41,11 @@ venta:
     transportista_publicado: "Blue Express / Copec"
     costo_clp: 0
     mensaje_marketing: "Envío gratis a todo Chile"
+    cobertura_nacional: "Se realizan envíos a todo Chile."
+    cobertura_internacional: >
+      También se realizan envíos al extranjero. Solicita país y ciudad y deriva al
+      equipo para confirmar costo, plazo y forma de pago. El envío gratis y el pago
+      contraentrega solo se informan para Chile, salvo confirmación humana distinta.
     plazo_santiago: "1 a 3 días"
     plazo_regiones: "2 a 5 días"
     regla_plazo: "Es un plazo publicado, no una garantía. No dice si son días hábiles."
@@ -51,7 +60,7 @@ venta:
       - Araucanía
       - Los Ríos
       - Los Lagos
-    regiones_excluidas_en_configuracion_formulario:
+    regiones_no_disponibles_en_formulario_web:
       - Arica y Parinacota
       - Tarapacá
       - Antofagasta
@@ -59,9 +68,10 @@ venta:
       - Aysén
       - Magallanes
     regla_cobertura: >
-      Existe una contradicción entre "todo Chile" y las regiones eliminadas del
-      formulario. Antes de prometer despacho pregunta la región. Si está excluida,
-      explica que el formulario no la muestra y deriva al contacto humano.
+      Los envíos cubren todo Chile. Si la región del cliente no aparece en el
+      formulario web, no niegues la cobertura: ofrece ingreso asistido y deriva al
+      contacto humano. Para el extranjero solicita país y ciudad antes de confirmar
+      costo, plazo o forma de pago.
   pedido:
     integracion_publicada: >
       Cada página de producto abre un formulario Releasit COD que crea el pedido
@@ -201,7 +211,9 @@ objeciones:
     la página del producto: recibe primero y paga al entregar.
   demora: "Informar los plazos publicados como estimados y aclarar que no indican días hábiles."
   compatibilidad: "Usar solo los datos confirmados; si falta el dato, escalar."
-  cobertura: "Validar región contra la lista del formulario antes de prometer envío."
+  cobertura: >
+    Informar envíos a todo Chile y al extranjero. Si el formulario no muestra la
+    región o el destino es internacional, escalar para confirmar las condiciones.
 
 handoff:
   contacto: "Equipo ESENCIALES"
@@ -212,7 +224,7 @@ handoff:
     - solicitud de cancelación o cambio de un pedido ya ingresado
     - pregunta médica o de seguridad sobre el TENS
     - cliente pide hablar con una persona
-    - región excluida o cobertura dudosa
+    - región ausente del formulario, destino internacional o condiciones de cobertura dudosas
     - garantía, devolución, compatibilidad o política no publicada
     - oferta de dos TENS por inconsistencia de descuento
     - solicitud de acceso, rectificación o eliminación de datos

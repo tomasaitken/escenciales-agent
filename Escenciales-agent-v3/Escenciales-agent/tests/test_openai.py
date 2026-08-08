@@ -6,7 +6,7 @@ from unittest.mock import patch
 import httpx
 from openai import AsyncOpenAI
 
-from agent.brain import cargar_system_prompt, generar_respuesta
+from agent.brain import cargar_system_prompt, generar_respuesta, sanitizar_respuesta
 
 
 class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
@@ -21,6 +21,26 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("lugar sin obstáculos", prompt)
         self.assertIn("El envío es gratis", prompt)
         self.assertIn("al momento de recibir el producto", prompt)
+
+    def test_prompt_no_expone_direccion_y_fija_ubicacion_aprobada(self):
+        prompt = cargar_system_prompt("instagram")
+
+        self.assertNotIn("Juan XXIII", prompt)
+        self.assertNotIn("5560", prompt)
+        self.assertIn('responde únicamente: "Estamos ubicados', prompt)
+        self.assertIn('en Santiago de Chile"', prompt)
+        self.assertIn("envíos a todo Chile y también al extranjero", prompt)
+
+    def test_bloquea_direccion_exacta_en_la_salida(self):
+        respuesta = sanitizar_respuesta(
+            "Estamos en calle Juan XXIII 5560, Santiago."
+        )
+
+        self.assertNotIn("Juan XXIII", respuesta)
+        self.assertNotIn("5560", respuesta)
+        self.assertIn("Santiago de Chile", respuesta)
+        self.assertIn("todo Chile", respuesta)
+        self.assertIn("extranjero", respuesta)
 
     async def test_usa_responses_api_y_modelo_configurado(self):
         async def handler(request: httpx.Request) -> httpx.Response:

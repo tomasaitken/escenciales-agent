@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import logging
 from pathlib import Path
@@ -15,6 +16,16 @@ CANAL_LABELS = {
     "instagram": "Instagram DM",
     "messenger": "Facebook Messenger",
 }
+
+RESPUESTA_UBICACION_SEGURA = (
+    "Estamos ubicados en Santiago de Chile. Hacemos envíos a todo Chile y también "
+    "al extranjero. Si me dices tu ciudad o país, te ayudo con el despacho."
+)
+
+PATRONES_DIRECCION_NO_PUBLICABLE = (
+    re.compile(r"\bjuan\s+(?:xxiii|23)\b", re.IGNORECASE),
+    re.compile(r"\b5560\b"),
+)
 
 
 def cargar_prompts_config() -> dict:
@@ -35,11 +46,29 @@ def cargar_business_config() -> dict:
         return {}
 
 
+def _config_para_agente(config: dict) -> dict:
+    """Retira datos legales que no deben aparecer en respuestas comerciales."""
+    negocio = config.get("negocio")
+    if isinstance(negocio, dict):
+        negocio.pop("direccion_publicada_privacidad", None)
+    return config
+
+
+def sanitizar_respuesta(respuesta: str) -> str:
+    """Impide que una dirección administrativa se filtre al cliente."""
+    if any(patron.search(respuesta) for patron in PATRONES_DIRECCION_NO_PUBLICABLE):
+        logger.warning("Se bloqueó una dirección exacta en la respuesta del agente")
+        return RESPUESTA_UBICACION_SEGURA
+    return respuesta
+
+
 def cargar_system_prompt(canal: str = "whatsapp") -> str:
     config = cargar_prompts_config()
     base = config.get("system_prompt", "Eres el asistente comercial de Escenciales. Responde en español.")
     negocio = yaml.safe_dump(
-        cargar_business_config(), allow_unicode=True, sort_keys=False
+        _config_para_agente(cargar_business_config()),
+        allow_unicode=True,
+        sort_keys=False,
     )
     canal_label = CANAL_LABELS.get(canal, canal)
     return (
@@ -97,7 +126,7 @@ async def generar_respuesta(
             safety_identifier=safety_identifier,
             store=False,
         )
-        respuesta = response.output_text.strip()
+        respuesta = sanitizar_respuesta(response.output_text.strip())
         if not respuesta:
             return obtener_mensaje_error()
         logger.info(
