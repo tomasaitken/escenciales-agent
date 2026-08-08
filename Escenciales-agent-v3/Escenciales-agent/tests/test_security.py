@@ -67,6 +67,20 @@ class SeguridadWebhookTests(unittest.TestCase):
         ).hexdigest()
         self.provider._validar_firma(request_con_firma(f"sha256={digest}"), body)
 
+    def test_acepta_firma_de_la_app_directa_de_instagram(self):
+        body = b'{"object":"instagram","entry":[]}'
+        with patch.dict(os.environ, {
+            "META_APP_SECRET": "secreto-app-principal",
+            "META_INSTAGRAM_APP_SECRET": "secreto-app-instagram",
+        }):
+            provider = ProveedorMetaMulticanal()
+            digest = hmac.new(
+                b"secreto-app-instagram", body, hashlib.sha256
+            ).hexdigest()
+            provider._validar_firma(
+                request_con_firma(f"sha256={digest}"), body
+            )
+
     def test_rechaza_firma_invalida(self):
         with self.assertRaises(HTTPException) as contexto:
             self.provider._validar_firma(
@@ -179,6 +193,50 @@ class EnvioInstagramTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parsea_mensaje_del_webhook_directo_de_instagram(self):
+        nombres = (
+            "META_APP_SECRET",
+            "META_INSTAGRAM_APP_SECRET",
+            "META_INSTAGRAM_ACCOUNT_ID",
+            "IG_PAGE_ID",
+        )
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        os.environ["META_APP_SECRET"] = "secreto-app-principal"
+        os.environ["META_INSTAGRAM_APP_SECRET"] = "secreto-app-instagram"
+        os.environ["META_INSTAGRAM_ACCOUNT_ID"] = "cuenta-instagram-directa"
+        os.environ["IG_PAGE_ID"] = "cuenta-instagram-facebook"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "object": "instagram",
+                "entry": [{"messaging": [{
+                    "sender": {"id": "cliente-instagram"},
+                    "recipient": {"id": "cuenta-instagram-directa"},
+                    "message": {
+                        "mid": "mensaje-instagram-directo-1",
+                        "text": "¿Dónde están ubicados?",
+                    },
+                }]}],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-app-instagram", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertEqual(mensajes[0].canal, "instagram")
+            self.assertEqual(mensajes[0].telefono, "cliente-instagram")
+            self.assertEqual(mensajes[0].texto, "¿Dónde están ubicados?")
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
     async def test_parsea_audio_whatsapp(self):
         anterior = os.environ.get("META_APP_SECRET")
         os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"

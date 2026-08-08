@@ -20,6 +20,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         self.page_token = os.getenv("META_PAGE_ACCESS_TOKEN") or self.wa_token
         self.instagram_token = os.getenv("META_INSTAGRAM_ACCESS_TOKEN")
         self.app_secret = os.getenv("META_APP_SECRET")
+        self.instagram_app_secret = os.getenv("META_INSTAGRAM_APP_SECRET")
         self.verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN")
         self.wa_phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
         self.ig_page_id = os.getenv("IG_PAGE_ID")
@@ -115,7 +116,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                     }
                     if echo_app_id in app_ids_propios:
                         continue
-                    if sender_id == self.ig_page_id:
+                    if sender_id in {self.ig_page_id, self.ig_account_id}:
                         canal = "instagram"
                     elif sender_id == self.fb_page_id:
                         canal = "messenger"
@@ -135,10 +136,15 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                         ))
                     continue
 
-                if sender_id in [self.ig_page_id, self.fb_page_id, self.wa_phone_id]:
+                if sender_id in [
+                    self.ig_page_id,
+                    self.ig_account_id,
+                    self.fb_page_id,
+                    self.wa_phone_id,
+                ]:
                     continue
 
-                if recipient_id == self.ig_page_id:
+                if recipient_id in {self.ig_page_id, self.ig_account_id}:
                     canal = "instagram"
                 else:
                     canal = "messenger"
@@ -239,18 +245,24 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         raise ValueError("Demasiadas redirecciones al descargar audio")
 
     def _validar_firma(self, request: Request, raw_body: bytes) -> None:
-        if not self.app_secret:
+        secretos = [
+            secreto for secreto in (self.app_secret, self.instagram_app_secret)
+            if secreto
+        ]
+        if not secretos:
             raise HTTPException(status_code=503, detail="Webhook no configurado")
 
         firma = request.headers.get("x-hub-signature-256", "")
         if not firma.startswith("sha256="):
             raise HTTPException(status_code=401, detail="Firma ausente")
 
-        esperada = "sha256=" + hmac.new(
-            self.app_secret.encode("utf-8"), raw_body, hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(firma, esperada):
-            raise HTTPException(status_code=401, detail="Firma inválida")
+        for secreto in secretos:
+            esperada = "sha256=" + hmac.new(
+                secreto.encode("utf-8"), raw_body, hashlib.sha256
+            ).hexdigest()
+            if hmac.compare_digest(firma, esperada):
+                return
+        raise HTTPException(status_code=401, detail="Firma inválida")
 
     async def enviar_mensaje(self, destinatario: str, mensaje: str, canal: str) -> bool:
         if canal == "whatsapp":
