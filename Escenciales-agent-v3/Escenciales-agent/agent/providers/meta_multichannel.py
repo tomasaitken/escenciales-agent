@@ -15,6 +15,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
     def __init__(self):
         self.app_id = os.getenv("META_APP_ID")
+        self.instagram_app_id = os.getenv("META_INSTAGRAM_APP_ID")
         self.wa_token = os.getenv("META_ACCESS_TOKEN")
         self.page_token = os.getenv("META_PAGE_ACCESS_TOKEN") or self.wa_token
         self.instagram_token = os.getenv("META_INSTAGRAM_ACCESS_TOKEN")
@@ -107,7 +108,12 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 msg = messaging.get("message", {})
 
                 if msg.get("is_echo"):
-                    if str(msg.get("app_id", "")) == str(self.app_id or ""):
+                    echo_app_id = str(msg.get("app_id", ""))
+                    app_ids_propios = {
+                        str(valor) for valor in (self.app_id, self.instagram_app_id)
+                        if valor
+                    }
+                    if echo_app_id in app_ids_propios:
                         continue
                     if sender_id == self.ig_page_id:
                         canal = "instagram"

@@ -213,10 +213,13 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
                 os.environ["META_APP_SECRET"] = anterior
 
     async def test_parsea_respuesta_manual_de_messenger_y_omite_echo_del_bot(self):
-        nombres = ("META_APP_SECRET", "META_APP_ID", "FB_PAGE_ID")
+        nombres = (
+            "META_APP_SECRET", "META_APP_ID", "META_INSTAGRAM_APP_ID", "FB_PAGE_ID"
+        )
         anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
         os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
         os.environ["META_APP_ID"] = "app-escenciales"
+        os.environ["META_INSTAGRAM_APP_ID"] = "instagram-app-escenciales"
         os.environ["FB_PAGE_ID"] = "pagina-escenciales"
         try:
             provider = ProveedorMetaMulticanal()
@@ -239,6 +242,16 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
                             "is_echo": True,
                             "app_id": "app-escenciales",
                             "text": "Respuesta enviada por el bot.",
+                        },
+                    },
+                    {
+                        "sender": {"id": "pagina-escenciales"},
+                        "recipient": {"id": "cliente-3"},
+                        "message": {
+                            "mid": "bot-instagram-1",
+                            "is_echo": True,
+                            "app_id": "instagram-app-escenciales",
+                            "text": "Respuesta enviada por el bot de Instagram.",
                         },
                     },
                 ]}],
