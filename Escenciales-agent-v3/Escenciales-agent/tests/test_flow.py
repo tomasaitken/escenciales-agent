@@ -163,19 +163,31 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             es_propio=False,
             canal="whatsapp",
         )
+        tercero = MensajeEntrante(
+            telefono=contacto,
+            texto="cuanto sale y como la compro",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+        )
         generar = AsyncMock(return_value="La antena cuesta $22.990.")
 
-        with patch.dict(os.environ, {"MESSAGE_DEBOUNCE_SECONDS": "0.05"}), patch.object(
+        with patch.dict(os.environ, {"MESSAGE_DEBOUNCE_SECONDS": "0.2"}), patch.object(
             main, "proveedor", proveedor
         ), patch.object(main, "generar_respuesta", generar):
             tarea_1 = asyncio.create_task(main.procesar_mensajes([primero]))
             await asyncio.sleep(0.01)
             tarea_2 = asyncio.create_task(main.procesar_mensajes([segundo]))
-            await asyncio.gather(tarea_1, tarea_2)
+            await asyncio.sleep(0.05)
+            tarea_3 = asyncio.create_task(main.procesar_mensajes([tercero]))
+            await asyncio.gather(tarea_1, tarea_2, tarea_3)
 
         self.assertEqual(len(proveedor.enviados), 1)
         self.assertEqual(generar.await_count, 1)
-        self.assertEqual(generar.await_args.args[0], "ola\nkiero la antena")
+        self.assertEqual(
+            generar.await_args.args[0],
+            "ola\nkiero la antena\ncuanto sale y como la compro",
+        )
 
     async def test_fragmentos_en_un_mismo_webhook_tambien_se_agrupan(self):
         contacto = "569" + uuid.uuid4().hex[:8]

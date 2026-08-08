@@ -48,7 +48,9 @@ _version_fragmentos: dict[str, int] = {}
 
 async def _esperar_fragmentos(msg):
     """Agrupa textos consecutivos del mismo contacto antes de responder."""
-    espera = max(0.0, float(os.getenv("MESSAGE_DEBOUNCE_SECONDS", "3")))
+    # Meta puede entregar mensajes enviados seguidos con varios segundos de
+    # diferencia. La espera se reinicia con cada fragmento nuevo.
+    espera = max(0.0, float(os.getenv("MESSAGE_DEBOUNCE_SECONDS", "8")))
     if espera == 0 or msg.es_propio or msg.tipo != "text":
         return [msg]
 
@@ -104,7 +106,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.1.0",
+    version="3.1.1",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -116,7 +118,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.1.0"
+        "version": "3.1.1"
     }
 
 
