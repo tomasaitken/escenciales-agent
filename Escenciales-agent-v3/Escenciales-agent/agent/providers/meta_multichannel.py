@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import time
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -29,6 +30,7 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         self.graph_version = os.getenv("META_GRAPH_API_VERSION", "v25.0")
         self.graph_url = f"https://graph.facebook.com/{self.graph_version}"
         self.instagram_graph_url = f"https://graph.instagram.com/{self.graph_version}"
+        self._ecos_bot: dict[str, float] = {}
 
     async def validar_webhook(self, request: Request):
         params = request.query_params
@@ -109,6 +111,10 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 msg = messaging.get("message", {})
 
                 if msg.get("is_echo"):
+                    if self._es_echo_del_bot(
+                        msg.get("mid", ""), recipient_id, msg.get("text", "")
+                    ):
+                        continue
                     echo_app_id = str(msg.get("app_id", ""))
                     app_ids_propios = {
                         str(valor) for valor in (self.app_id, self.instagram_app_id)
@@ -264,6 +270,40 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 return
         raise HTTPException(status_code=401, detail="Firma inválida")
 
+    def _limpiar_ecos_bot(self) -> None:
+        ahora = time.monotonic()
+        self._ecos_bot = {
+            clave: expira for clave, expira in self._ecos_bot.items()
+            if expira > ahora
+        }
+
+    @staticmethod
+    def _clave_echo_texto(destinatario: str, texto: str) -> str:
+        return f"texto:{destinatario}:{texto}"
+
+    def _registrar_salida_bot(
+        self, destinatario: str, texto: str, mensaje_id: str = ""
+    ) -> None:
+        self._limpiar_ecos_bot()
+        expira = time.monotonic() + 180
+        self._ecos_bot[self._clave_echo_texto(destinatario, texto)] = expira
+        if mensaje_id:
+            self._ecos_bot[f"id:{mensaje_id}"] = expira
+
+    def _descartar_salida_bot(self, destinatario: str, texto: str) -> None:
+        self._ecos_bot.pop(self._clave_echo_texto(destinatario, texto), None)
+
+    def _es_echo_del_bot(
+        self, mensaje_id: str, destinatario: str, texto: str
+    ) -> bool:
+        self._limpiar_ecos_bot()
+        claves = []
+        if mensaje_id:
+            claves.append(f"id:{mensaje_id}")
+        if destinatario and texto:
+            claves.append(self._clave_echo_texto(destinatario, texto))
+        return any(clave in self._ecos_bot for clave in claves)
+
     async def enviar_mensaje(self, destinatario: str, mensaje: str, canal: str) -> bool:
         if canal == "whatsapp":
             if not self.wa_token:
@@ -322,13 +362,25 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         }
         if canal == "messenger":
             payload["messaging_type"] = "RESPONSE"
+        self._registrar_salida_bot(recipient_id, texto)
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{graph_url}/{page_id}/messages",
-                headers={"Authorization": f"Bearer {token}"},
-                json=payload,
-            )
+            try:
+                resp = await client.post(
+                    f"{graph_url}/{page_id}/messages",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=payload,
+                )
+            except Exception:
+                self._descartar_salida_bot(recipient_id, texto)
+                raise
             if resp.status_code != 200:
+                self._descartar_salida_bot(recipient_id, texto)
                 logger.error("Graph send failed status=%s canal=%s", resp.status_code, canal)
                 return False
+            try:
+                mensaje_id = str(resp.json().get("message_id", ""))
+            except (ValueError, AttributeError):
+                mensaje_id = ""
+            if mensaje_id:
+                self._registrar_salida_bot(recipient_id, texto, mensaje_id)
             return True

@@ -149,6 +149,9 @@ class EnvioInstagramTests(unittest.IsolatedAsyncioTestCase):
         class Respuesta:
             status_code = 200
 
+            def json(self):
+                return {"message_id": "mensaje-saliente-instagram-1"}
+
         class ClienteFalso:
             def __init__(self, *args, **kwargs):
                 pass
@@ -193,6 +196,51 @@ class EnvioInstagramTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
+    async def test_omite_echo_directo_del_mensaje_enviado_por_el_bot(self):
+        nombres = (
+            "META_APP_SECRET",
+            "META_INSTAGRAM_APP_SECRET",
+            "META_INSTAGRAM_ACCOUNT_ID",
+        )
+        anteriores = {nombre: os.environ.get(nombre) for nombre in nombres}
+        os.environ["META_APP_SECRET"] = "secreto-app-principal"
+        os.environ["META_INSTAGRAM_APP_SECRET"] = "secreto-app-instagram"
+        os.environ["META_INSTAGRAM_ACCOUNT_ID"] = "cuenta-instagram-directa"
+        try:
+            provider = ProveedorMetaMulticanal()
+            provider._registrar_salida_bot(
+                "cliente-instagram",
+                "Respuesta enviada por el agente.",
+                "mensaje-bot-1",
+            )
+            payload = {
+                "object": "instagram",
+                "entry": [{"messaging": [{
+                    "sender": {"id": "cuenta-instagram-directa"},
+                    "recipient": {"id": "cliente-instagram"},
+                    "message": {
+                        "mid": "mensaje-bot-1",
+                        "is_echo": True,
+                        "text": "Respuesta enviada por el agente.",
+                    },
+                }]}],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-app-instagram", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(mensajes, [])
+        finally:
+            for nombre, valor in anteriores.items():
+                if valor is None:
+                    os.environ.pop(nombre, None)
+                else:
+                    os.environ[nombre] = valor
+
     async def test_parsea_mensaje_del_webhook_directo_de_instagram(self):
         nombres = (
             "META_APP_SECRET",
