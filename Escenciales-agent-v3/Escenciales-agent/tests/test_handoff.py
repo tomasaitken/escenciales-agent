@@ -35,6 +35,9 @@ class HandoffTests(unittest.TestCase):
     def test_mensaje_pedido_protege_credenciales(self):
         mensaje = mensaje_handoff("pedido_asistido")
         self.assertIn("persona del equipo", mensaje)
+        self.assertIn("este mismo chat", mensaje)
+        self.assertIn("otro número", mensaje)
+        self.assertNotIn("3866 3898", mensaje)
         self.assertIn("contraseñas", mensaje)
 
     def test_detecta_pedido_asistido_con_ortografia_muy_basica(self):

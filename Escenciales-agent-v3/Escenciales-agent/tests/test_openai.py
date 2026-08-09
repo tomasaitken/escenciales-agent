@@ -49,8 +49,12 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Producto identificado desde el anuncio", prompt)
         self.assertIn("nunca preguntes cuál le interesa", prompt)
         self.assertIn("No menciones la marca interna", prompt)
-        self.assertIn("ENLACE DE COMPRA EN SEGUNDO MENSAJE", prompt)
-        self.assertIn("no incluyas ninguna URL", prompt)
+        self.assertIn("ENLACE DE COMPRA SOLO CUANDO EL CLIENTE ESTÁ LISTO", prompt)
+        self.assertIn("nunca incluyas URLs", prompt)
+        self.assertIn("precio va antes que el enganche comercial", prompt)
+        self.assertIn("flujo es semiautomático", prompt)
+        self.assertIn("por ese mismo chat", prompt)
+        self.assertNotIn("+56 9 3866 3898", prompt)
 
     def test_prompt_incorpora_respuestas_probadas_sin_volverse_guion(self):
         prompt = cargar_system_prompt("whatsapp")

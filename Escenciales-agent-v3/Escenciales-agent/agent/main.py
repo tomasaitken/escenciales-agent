@@ -124,7 +124,49 @@ def _mensaje_compra(producto: str | None, historial: list[dict]) -> str | None:
     if not url or any(url in str(item.get("content", "")) for item in historial):
         return None
     pronombre = "lo" if producto == "Electroestimulador TENS" else "la"
-    return f"🛒 Puedes comprar{pronombre} directamente aquí:\n{url}"
+    return (
+        f"🛒 Cuando quieras comprar{pronombre}, puedes hacerlo aquí:\n{url}\n\n"
+        'Pulsa "PAGA Contra ENTREGA" y completa el formulario. Si se te '
+        "complica, dime y una persona del equipo sigue contigo por este mismo chat."
+    )
+
+
+def _debe_enviar_enlace(texto: str, historial: list[dict]) -> bool:
+    """Entrega el checkout solo cuando el cliente muestra intención de compra."""
+    normalizado = _normalizar(texto)
+    patrones = (
+        r"\b(como|donde)\s+(?:lo\s+|la\s+)?(compro|pido|encargo)\b",
+        r"\bcomo\s+(?:hago|realizo|ingreso)\b.{0,25}\b(pedido|compra)\b",
+        r"\b(quiero|kiero|qro|voy a|deseo)\b.{0,25}\b(comprar|pedir|encargar)\b",
+        r"\b(lo|la|me lo|me la)\s+(llevo|quedo|compro)\b",
+        r"\b(manda|mandame|pasa|pasame|envia|enviame)\w*\b.{0,25}\b(link|enlace)\b",
+        r"\b(link|enlace)\b.{0,25}\b(comprar|compra|pedido|pagar)\b",
+        r"\b(hacer|realizar|ingresar)\b.{0,20}\b(el\s+)?pedido\b",
+    )
+    if any(re.search(patron, normalizado) for patron in patrones):
+        return True
+
+    confirmacion_breve = re.fullmatch(
+        r"\s*(si|sipo|sip|ya|ok|okay|dale|bueno|quiero)\s*[.!?]*\s*",
+        normalizado,
+    )
+    if not confirmacion_breve:
+        return False
+    ultima_respuesta = next(
+        (
+            _normalizar(str(item.get("content", "")))
+            for item in reversed(historial)
+            if item.get("role") == "assistant"
+        ),
+        "",
+    )
+    return bool(
+        re.search(
+            r"\b(compr\w*|pedido|formulario|link|enlace|paga contra entrega)\b",
+            ultima_respuesta,
+        )
+        and "?" in ultima_respuesta
+    )
 
 
 async def _resolver_producto_visual_anuncio(msg):
@@ -219,7 +261,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.2.1",
+    version="3.3.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -231,7 +273,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.2.1"
+        "version": "3.3.0"
     }
 
 
@@ -444,7 +486,12 @@ async def procesar_mensajes(mensajes):
                 obtener_mensaje_error(),
                 obtener_mensaje_fallback(),
             }
-            if enviado and not ticket_modelo and not respuesta_tecnica:
+            if (
+                enviado
+                and not ticket_modelo
+                and not respuesta_tecnica
+                and _debe_enviar_enlace(texto, historial)
+            ):
                 mensaje_compra = _mensaje_compra(producto_conversacion, historial)
                 if mensaje_compra:
                     enlace_enviado = await proveedor.enviar_mensaje(

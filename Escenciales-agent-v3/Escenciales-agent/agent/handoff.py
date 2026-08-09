@@ -93,8 +93,8 @@ def detectar_handoff(texto: str) -> str | None:
 def mensaje_handoff(motivo: str) -> str:
     if motivo == "pedido_asistido":
         return (
-            "Sí, podemos ayudarte a ingresar el pedido. Voy a dejar esta conversación "
-            "pendiente para que una persona del equipo continúe contigo por aquí. "
+            "Claro, podemos ayudarte a ingresar el pedido. Una persona del equipo "
+            "continuará contigo por este mismo chat; no necesitas escribir a otro número. "
             "No envíes datos de tarjeta, claves ni contraseñas."
         )
     if motivo == "seguridad_tens":
@@ -126,7 +126,7 @@ def mensaje_handoff(motivo: str) -> str:
         )
     return (
         "Voy a dejar esta conversación pendiente para que una persona del equipo "
-        "continúe contigo por aquí."
+        "continúe contigo por este mismo chat. No necesitas escribir a otro número."
     )
 
 

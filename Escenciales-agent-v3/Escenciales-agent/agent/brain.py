@@ -52,10 +52,21 @@ def cargar_business_config() -> dict:
 
 
 def _config_para_agente(config: dict) -> dict:
-    """Retira datos legales que no deben aparecer en respuestas comerciales."""
+    """Retira datos operativos que no deben aparecer en respuestas comerciales."""
     negocio = config.get("negocio")
     if isinstance(negocio, dict):
         negocio.pop("direccion_publicada_privacidad", None)
+        negocio.pop("telefono", None)
+    handoff = config.get("handoff")
+    if isinstance(handoff, dict):
+        handoff.pop("telefono", None)
+    politicas = config.get("politicas")
+    if isinstance(politicas, dict) and isinstance(
+        politicas.get("derechos_privacidad"), str
+    ):
+        politicas["derechos_privacidad"] = politicas[
+            "derechos_privacidad"
+        ].replace("+56 9 3866 3898", "el equipo por este mismo chat")
     return config
 
 

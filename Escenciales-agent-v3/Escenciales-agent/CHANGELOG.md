@@ -1,5 +1,15 @@
 # Cambios
 
+## 3.3.0 — 2026-08-09
+
+- Flujo comercial semiautomático: precio, envío gratis y pago al recibir aparecen
+  antes del enganche comercial en la primera explicación del producto.
+- El enlace de compra deja de enviarse ante consultas genéricas o de precio y se
+  reserva para intención explícita de compra.
+- El mensaje de checkout ofrece ayuda con el formulario por el mismo chat.
+- Los pedidos asistidos se derivan a una persona del equipo sin repetir el número
+  de WhatsApp y el agente queda pausado para permitir el cierre humano.
+
 ## 3.2.1 — 2026-08-08
 
 - Reconocimiento visual de anuncios de Meta en video cuando el título y el texto

@@ -50,12 +50,39 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             mensaje = main._mensaje_compra(producto, [])
             self.assertIn("🛒", mensaje)
             self.assertIn(variante, mensaje)
+            self.assertIn("PAGA Contra ENTREGA", mensaje)
+            self.assertIn("este mismo chat", mensaje)
+            self.assertNotIn("3866 3898", mensaje)
             self.assertIsNone(
                 main._mensaje_compra(
                     producto,
                     [{"role": "assistant", "content": mensaje}],
                 )
             )
+
+    def test_enlace_solo_con_intencion_explicita_de_compra(self):
+        for texto in (
+            "Hola, quiero más información",
+            "¿Cuánto cuesta la ducha?",
+            "¿Cómo funciona la antena?",
+        ):
+            with self.subTest(texto=texto):
+                self.assertFalse(main._debe_enviar_enlace(texto, []))
+
+        for texto in (
+            "¿Cómo la compro?",
+            "Quiero comprar el TENS",
+            "Mándame el link para comprar",
+            "¿Cómo hago el pedido?",
+        ):
+            with self.subTest(texto=texto):
+                self.assertTrue(main._debe_enviar_enlace(texto, []))
+
+        historial = [{
+            "role": "assistant",
+            "content": "¿Quieres que te ayude a comprarla?",
+        }]
+        self.assertTrue(main._debe_enviar_enlace("Sí", historial))
 
     async def test_pedido_asistido_responde_una_vez_y_pausa(self):
         contacto = "569" + uuid.uuid4().hex[:8]
@@ -235,7 +262,7 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
         ):
             await main.procesar_mensajes([mensaje])
 
-        self.assertEqual(len(proveedor.enviados), 2)
+        self.assertEqual(len(proveedor.enviados), 1)
         self.assertEqual(generar.await_count, 1)
         self.assertEqual(
             generar.await_args.args[0],
@@ -243,8 +270,6 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             "Antena Digital Full HD 4K]\n"
             "Hello! Can I get more info on this?\nHola",
         )
-        self.assertIn("🛒", proveedor.enviados[1][1])
-        self.assertIn("53910086058352", proveedor.enviados[1][1])
 
     async def test_anuncio_de_video_generico_se_identifica_por_miniatura(self):
         contacto = "569" + uuid.uuid4().hex[:8]
@@ -270,14 +295,13 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(proveedor.miniaturas_leidas, 1)
         self.assertEqual(clasificar.await_count, 1)
-        self.assertEqual(len(proveedor.enviados), 2)
+        self.assertEqual(len(proveedor.enviados), 1)
         self.assertEqual(
             generar.await_args.args[0],
             "[Producto identificado desde el anuncio de Meta: "
             "Electroestimulador TENS]\n"
             "Hola, quiero más información",
         )
-        self.assertIn("54012229452144", proveedor.enviados[1][1])
 
     async def test_fragmentos_en_un_mismo_webhook_tambien_se_agrupan(self):
         contacto = "569" + uuid.uuid4().hex[:8]
@@ -299,7 +323,7 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(main, "generar_respuesta", generar):
             await main.procesar_mensajes(mensajes)
 
-        self.assertEqual(len(proveedor.enviados), 2)
+        self.assertEqual(len(proveedor.enviados), 1)
         self.assertEqual(generar.await_count, 1)
         self.assertEqual(generar.await_args.args[0], "hola\nkiero\nla antena")
 

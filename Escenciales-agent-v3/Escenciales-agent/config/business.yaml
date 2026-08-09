@@ -78,8 +78,10 @@ venta:
       Cada página de producto abre un formulario Releasit COD que crea el pedido
       en Shopify. El formulario no guarda el pedido como borrador.
     ruta_preferida: >
-      Confirmar producto, cantidad y región; luego enviar la URL oficial del producto
-      para que el cliente complete el formulario seguro "PAGA Contra ENTREGA".
+      Informar primero precio, envío gratis y pago al recibir; conversar y responder
+      dudas; cuando exista intención explícita de compra, enviar la URL oficial para
+      completar el formulario seguro "PAGA Contra ENTREGA". Si requiere ayuda, una
+      persona del equipo continúa por el mismo chat y hace el cierre.
     datos_obligatorios_formulario:
       - nombre
       - apellido
@@ -98,9 +100,10 @@ venta:
       - claves bancarias
       - fotografías de documentos
     regla_chat: >
-      Si el cliente no puede usar el formulario y pide comprar por chat, recopila
-      solo los campos obligatorios, resume y deriva para ingreso manual. Nunca
-      afirmes que el pedido fue creado mientras no exista confirmación del sistema.
+      Si el cliente no puede usar el formulario o pide comprar por chat, deriva a
+      una persona del equipo por el mismo chat para el cierre e ingreso manual. No
+      repitas el número de WhatsApp ni afirmes que el pedido fue creado mientras no
+      exista confirmación del sistema.
 
 catalogo:
   - product_id: 15172731404656
@@ -246,17 +249,19 @@ guia_atencion_validada_por_propietaria:
     Estas pautas provienen de respuestas manuales que han funcionado con clientes.
     Deben orientar el contenido y el orden de la respuesta, no copiarse literalmente.
   precio_producto: >
-    Dar el precio vigente del producto consultado, explicar que el envío es gratis
-    en Chile y que se paga al recibir. Hacer como máximo una pregunta breve que sea
-    útil para ese mismo producto.
+    En la primera explicación dar primero el precio vigente del producto consultado,
+    el envío gratis en Chile y el pago al recibir. Después agregar un beneficio o
+    enganche relevante y como máximo una pregunta breve sobre ese mismo producto.
   compra_por_web: >
-    Enviar únicamente el enlace de compra del producto consultado. Explicar en
+    No enviar el enlace durante una consulta inicial. Enviarlo solo cuando el cliente
+    pregunte cómo comprar, pida el enlace o diga que quiere avanzar. Explicar en
     lenguaje simple: abrir el enlace, pulsar "PAGA Contra ENTREGA", completar el
     formulario y pulsar "Completa tu Compra". No afirmar que el pedido quedó creado
     sin confirmación del sistema.
   ayuda_formulario: >
     Ofrecer ayuda para completar el formulario. Si el cliente no puede hacerlo o
-    pide que el equipo ingrese el pedido, activar el flujo de pedido asistido.
+    pide que el equipo ingrese el pedido, activar pedido asistido para que una persona
+    continúe por el mismo chat; no repetir el número de WhatsApp.
   ubicacion_y_despacho: >
     Decir que la tienda está en Santiago y despacha gratis a todo Chile. Preguntar
     comuna solo cuando sirva para orientar el despacho o la instalación del producto.
