@@ -16,6 +16,8 @@ class MensajeEntrante:
     media_url: str | None = field(default=None)
     mime_type: str | None = field(default=None)
     contexto_producto: str | None = field(default=None)
+    contexto_media_url: str | None = field(default=None)
+    contexto_anuncio_id: str | None = field(default=None)
 
 
 class ProveedorWhatsApp(ABC):
@@ -30,6 +32,11 @@ class ProveedorWhatsApp(ABC):
         ...
 
     async def obtener_audio(self, mensaje: MensajeEntrante) -> tuple[bytes, str]:
+        raise NotImplementedError
+
+    async def obtener_imagen_anuncio(
+        self, mensaje: MensajeEntrante
+    ) -> tuple[bytes, str]:
         raise NotImplementedError
 
     async def validar_webhook(self, request: Request) -> dict | int | None:

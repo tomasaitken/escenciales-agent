@@ -1,5 +1,15 @@
 # Cambios
 
+## 3.2.1 — 2026-08-08
+
+- Reconocimiento visual de anuncios de Meta en video cuando el título y el texto
+  del anuncio no nombran el producto.
+- La miniatura temporal del anuncio se clasifica únicamente como TENS, antena,
+  ducha o desconocido; no se conserva la imagen.
+- El producto identificado se guarda en una caché acotada por ID de anuncio para
+  evitar análisis repetidos dentro de la misma ejecución.
+- Validación de dominio, formato y tamaño antes de procesar la miniatura.
+
 ## 3.2.0 — 2026-08-08
 
 - Reconocimiento del producto desde el contexto de anuncios de Meta en WhatsApp,

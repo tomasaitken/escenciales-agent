@@ -1,3 +1,4 @@
+import base64
 import os
 import re
 import yaml
@@ -148,3 +149,58 @@ async def generar_respuesta(
     except Exception as exc:
         logger.error("Error OpenAI API tipo=%s", type(exc).__name__)
         return obtener_mensaje_error()
+
+
+async def identificar_producto_desde_imagen(
+    contenido: bytes,
+    mime_type: str,
+    safety_identifier: str | None = None,
+) -> str | None:
+    """Clasifica una miniatura de anuncio dentro del catálogo cerrado."""
+    if not contenido or len(contenido) > 5_242_880:
+        return None
+    formatos = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if mime_type not in formatos:
+        return None
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+    data_url = (
+        f"data:{mime_type};base64,"
+        + base64.b64encode(contenido).decode("ascii")
+    )
+    try:
+        client = AsyncOpenAI(api_key=api_key)
+        response = await client.responses.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
+            instructions=(
+                "Clasifica esta miniatura de un anuncio de la tienda Escenciales. "
+                "Responde exactamente con una de estas cuatro etiquetas, sin explicar: "
+                "TENS, ANTENA, DUCHA o DESCONOCIDO. Usa TENS si aparece un "
+                "electroestimulador con electrodos; ANTENA si aparece una antena de TV; "
+                "DUCHA si aparece un cabezal de ducha. Si no es claro, DESCONOCIDO."
+            ),
+            input=[{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "Identifica el producto anunciado."},
+                    {"type": "input_image", "image_url": data_url, "detail": "low"},
+                ],
+            }],
+            max_output_tokens=80,
+            reasoning={"effort": "low"},
+            safety_identifier=safety_identifier,
+            store=False,
+        )
+        etiqueta = re.sub(r"[^a-z]", "", response.output_text.lower())
+        return {
+            "tens": "Electroestimulador TENS",
+            "antena": "Antena Digital Full HD 4K",
+            "ducha": "Cabezal de ducha",
+        }.get(etiqueta)
+    except Exception as exc:
+        logger.warning(
+            "No se pudo clasificar miniatura de anuncio tipo=%s",
+            type(exc).__name__,
+        )
+        return None

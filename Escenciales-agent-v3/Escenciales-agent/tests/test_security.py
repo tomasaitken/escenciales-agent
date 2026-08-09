@@ -366,6 +366,57 @@ class ParseoAudioTests(unittest.IsolatedAsyncioTestCase):
             else:
                 os.environ["META_APP_SECRET"] = anterior
 
+    async def test_extrae_miniatura_de_anuncio_de_video_generico(self):
+        anterior = os.environ.get("META_APP_SECRET")
+        os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"
+        try:
+            provider = ProveedorMetaMulticanal()
+            payload = {
+                "entry": [{
+                    "changes": [{
+                        "field": "messages",
+                        "value": {"messages": [{
+                            "from": "56911111111",
+                            "id": "wamid.video-ad-1",
+                            "type": "text",
+                            "text": {"body": "Hola, quiero más información"},
+                            "referral": {
+                                "source_type": "ad",
+                                "source_id": "120000000000001",
+                                "headline": "Conoce nuestra oferta",
+                                "body": "Más información aquí",
+                                "media_type": "video",
+                                "video_url": "https://video.xx.fbcdn.net/anuncio.mp4",
+                                "thumbnail_url": "https://scontent.xx.fbcdn.net/tens.jpg",
+                            },
+                        }]},
+                    }],
+                }],
+            }
+            body = json.dumps(payload).encode()
+            digest = hmac.new(
+                b"secreto-de-prueba-no-real", body, hashlib.sha256
+            ).hexdigest()
+            mensajes = await provider.parsear_webhook(
+                request_con_body(body, f"sha256={digest}")
+            )
+
+            self.assertEqual(len(mensajes), 1)
+            self.assertIsNone(mensajes[0].contexto_producto)
+            self.assertEqual(
+                mensajes[0].contexto_media_url,
+                "https://scontent.xx.fbcdn.net/tens.jpg",
+            )
+            self.assertEqual(
+                mensajes[0].contexto_anuncio_id,
+                "120000000000001",
+            )
+        finally:
+            if anterior is None:
+                os.environ.pop("META_APP_SECRET", None)
+            else:
+                os.environ["META_APP_SECRET"] = anterior
+
     async def test_parsea_imagen_whatsapp_con_descripcion(self):
         anterior = os.environ.get("META_APP_SECRET")
         os.environ["META_APP_SECRET"] = "secreto-de-prueba-no-real"

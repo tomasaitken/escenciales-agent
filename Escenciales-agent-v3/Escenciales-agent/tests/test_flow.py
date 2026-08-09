@@ -21,6 +21,7 @@ from agent.providers.base import MensajeEntrante  # noqa: E402
 class ProveedorFalso:
     def __init__(self):
         self.enviados = []
+        self.miniaturas_leidas = 0
 
     async def enviar_mensaje(self, destinatario, mensaje, canal):
         self.enviados.append((destinatario, mensaje, canal))
@@ -29,10 +30,15 @@ class ProveedorFalso:
     async def obtener_audio(self, mensaje):
         raise AssertionError("No corresponde audio")
 
+    async def obtener_imagen_anuncio(self, mensaje):
+        self.miniaturas_leidas += 1
+        return b"miniatura-de-prueba", "image/jpeg"
+
 
 class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await inicializar_db()
+        main._productos_anuncio_cache.clear()
 
     def test_enlaces_de_compra_son_oficiales_y_no_se_repiten(self):
         casos = {
@@ -239,6 +245,39 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("🛒", proveedor.enviados[1][1])
         self.assertIn("53910086058352", proveedor.enviados[1][1])
+
+    async def test_anuncio_de_video_generico_se_identifica_por_miniatura(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        mensaje = MensajeEntrante(
+            telefono=contacto,
+            texto="Hola, quiero más información",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+            contexto_media_url="https://scontent.xx.fbcdn.net/tens.jpg",
+            contexto_anuncio_id="anuncio-video-tens",
+        )
+        generar = AsyncMock(return_value="Claro, te cuento sobre el TENS.")
+        clasificar = AsyncMock(return_value="Electroestimulador TENS")
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "generar_respuesta", generar
+        ), patch.object(
+            main, "identificar_producto_desde_imagen", clasificar
+        ):
+            await main.procesar_mensajes([mensaje])
+
+        self.assertEqual(proveedor.miniaturas_leidas, 1)
+        self.assertEqual(clasificar.await_count, 1)
+        self.assertEqual(len(proveedor.enviados), 2)
+        self.assertEqual(
+            generar.await_args.args[0],
+            "[Producto identificado desde el anuncio de Meta: "
+            "Electroestimulador TENS]\n"
+            "Hola, quiero más información",
+        )
+        self.assertIn("54012229452144", proveedor.enviados[1][1])
 
     async def test_fragmentos_en_un_mismo_webhook_tambien_se_agrupan(self):
         contacto = "569" + uuid.uuid4().hex[:8]

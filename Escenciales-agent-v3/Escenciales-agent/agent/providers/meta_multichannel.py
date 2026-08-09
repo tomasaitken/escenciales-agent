@@ -22,7 +22,7 @@ def _producto_desde_referencia_anuncio(referencia: object) -> str | None:
 
     campos = (
         "headline", "body", "source_url", "source_type",
-        "ad_id", "ref", "referer_uri",
+        "source_id", "ad_id", "ref", "referer_uri",
     )
     contenido = " ".join(str(referencia.get(campo, "")) for campo in campos)
     contenido = unicodedata.normalize("NFKD", contenido)
@@ -50,6 +50,27 @@ def _producto_desde_referencia_anuncio(referencia: object) -> str | None:
         (producto for patron, producto in patrones if re.search(patron, contenido)),
         None,
     )
+
+
+def _datos_media_referencia_anuncio(
+    referencia: object,
+) -> tuple[str | None, str | None]:
+    """Extrae únicamente la miniatura y el ID no sensible del anuncio."""
+    if not isinstance(referencia, dict):
+        return None, None
+    media_type = str(referencia.get("media_type", "")).lower()
+    if media_type == "video":
+        media_url = referencia.get("thumbnail_url")
+    elif media_type == "image":
+        media_url = referencia.get("image_url")
+    else:
+        media_url = referencia.get("thumbnail_url") or referencia.get("image_url")
+    if not isinstance(media_url, str) or not media_url.strip():
+        media_url = None
+    anuncio_id = referencia.get("source_id") or referencia.get("ad_id")
+    if anuncio_id is not None:
+        anuncio_id = str(anuncio_id).strip() or None
+    return media_url, anuncio_id
 
 class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
@@ -123,8 +144,12 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                 if field != "messages":
                     continue
                 for msg in value.get("messages", []):
+                    referencia = msg.get("referral")
                     contexto_producto = _producto_desde_referencia_anuncio(
-                        msg.get("referral")
+                        referencia
+                    )
+                    contexto_media_url, contexto_anuncio_id = (
+                        _datos_media_referencia_anuncio(referencia)
                     )
                     if msg.get("type") == "text":
                         mensajes.append(MensajeEntrante(
@@ -134,6 +159,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                             es_propio=False,
                             canal="whatsapp",
                             contexto_producto=contexto_producto,
+                            contexto_media_url=contexto_media_url,
+                            contexto_anuncio_id=contexto_anuncio_id,
                         ))
                     elif msg.get("type") == "audio":
                         audio = msg.get("audio", {})
@@ -147,6 +174,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                             media_id=audio.get("id"),
                             mime_type=audio.get("mime_type"),
                             contexto_producto=contexto_producto,
+                            contexto_media_url=contexto_media_url,
+                            contexto_anuncio_id=contexto_anuncio_id,
                         ))
                     elif msg.get("type") == "image":
                         imagen = msg.get("image", {})
@@ -160,6 +189,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                             media_id=imagen.get("id"),
                             mime_type=imagen.get("mime_type"),
                             contexto_producto=contexto_producto,
+                            contexto_media_url=contexto_media_url,
+                            contexto_anuncio_id=contexto_anuncio_id,
                         ))
 
             for messaging in entry.get("messaging", []):
@@ -214,10 +245,14 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
 
                 texto = msg.get("text", "")
                 attachments = msg.get("attachments", [])
-                contexto_producto = _producto_desde_referencia_anuncio(
+                referencia = (
                     messaging.get("referral")
                     or msg.get("referral")
                     or messaging.get("postback", {}).get("referral")
+                )
+                contexto_producto = _producto_desde_referencia_anuncio(referencia)
+                contexto_media_url, contexto_anuncio_id = (
+                    _datos_media_referencia_anuncio(referencia)
                 )
                 imagen = next(
                     (adjunto for adjunto in attachments if adjunto.get("type") == "image"),
@@ -233,6 +268,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                         tipo="image",
                         media_url=imagen.get("payload", {}).get("url"),
                         contexto_producto=contexto_producto,
+                        contexto_media_url=contexto_media_url,
+                        contexto_anuncio_id=contexto_anuncio_id,
                     ))
                 elif texto:
                     mensajes.append(MensajeEntrante(
@@ -242,6 +279,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                         es_propio=False,
                         canal=canal,
                         contexto_producto=contexto_producto,
+                        contexto_media_url=contexto_media_url,
+                        contexto_anuncio_id=contexto_anuncio_id,
                     ))
 
                 for indice, attachment in enumerate(attachments):
@@ -257,6 +296,8 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
                         tipo="audio",
                         media_url=payload.get("url"),
                         contexto_producto=contexto_producto,
+                        contexto_media_url=contexto_media_url,
+                        contexto_anuncio_id=contexto_anuncio_id,
                     ))
 
         return mensajes
@@ -284,6 +325,27 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
         contenido, content_type = await self._descargar_media_meta(media_url, token)
         return contenido, (mime_type or content_type or "application/octet-stream")
 
+    async def obtener_imagen_anuncio(
+        self, mensaje: MensajeEntrante
+    ) -> tuple[bytes, str]:
+        if not mensaje.contexto_media_url:
+            raise ValueError("Anuncio sin miniatura")
+        if mensaje.canal == "whatsapp":
+            token = self.wa_token
+        elif mensaje.canal == "instagram":
+            token = self.instagram_token
+        else:
+            token = self.page_token
+        contenido, content_type = await self._descargar_media_meta(
+            mensaje.contexto_media_url,
+            token,
+            max_bytes=int(os.getenv("MAX_AD_THUMBNAIL_BYTES", "5242880")),
+        )
+        mime_type = content_type.split(";", 1)[0].strip().lower()
+        if mime_type not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
+            raise ValueError("Miniatura de anuncio con formato no permitido")
+        return contenido, mime_type
+
     @staticmethod
     def _validar_url_media(url: str) -> None:
         parsed = urlparse(url)
@@ -298,9 +360,9 @@ class ProveedorMetaMulticanal(ProveedorWhatsApp):
             raise ValueError("URL de audio fuera de dominios Meta permitidos")
 
     async def _descargar_media_meta(
-        self, url: str, token: str | None
+        self, url: str, token: str | None, max_bytes: int | None = None
     ) -> tuple[bytes, str]:
-        max_bytes = int(os.getenv("MAX_AUDIO_BYTES", "10485760"))
+        max_bytes = max_bytes or int(os.getenv("MAX_AUDIO_BYTES", "10485760"))
         if not token:
             raise ValueError("Token de Meta no configurado para descargar audio")
         headers = {"Authorization": f"Bearer {token}"}

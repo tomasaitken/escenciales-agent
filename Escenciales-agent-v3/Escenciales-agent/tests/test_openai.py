@@ -6,7 +6,12 @@ from unittest.mock import patch
 import httpx
 from openai import AsyncOpenAI
 
-from agent.brain import cargar_system_prompt, generar_respuesta, sanitizar_respuesta
+from agent.brain import (
+    cargar_system_prompt,
+    generar_respuesta,
+    identificar_producto_desde_imagen,
+    sanitizar_respuesta,
+)
 
 
 class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
@@ -139,6 +144,62 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
                     safety_identifier="esc_prueba",
                 )
             self.assertEqual(respuesta, "El TENS cuesta $29.990.")
+        finally:
+            await client.close()
+
+    async def test_clasifica_miniatura_de_anuncio_en_catalogo_cerrado(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            body = json.loads(request.content)
+            contenido = body["input"][0]["content"]
+            self.assertEqual(contenido[1]["type"], "input_image")
+            self.assertEqual(contenido[1]["detail"], "low")
+            self.assertTrue(
+                contenido[1]["image_url"].startswith("data:image/jpeg;base64,")
+            )
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "id": "resp_vision",
+                    "object": "response",
+                    "created_at": 1,
+                    "status": "completed",
+                    "model": "gpt-5.6-terra",
+                    "output": [{
+                        "id": "msg_vision",
+                        "type": "message",
+                        "status": "completed",
+                        "role": "assistant",
+                        "content": [{
+                            "type": "output_text",
+                            "text": "TENS",
+                            "annotations": [],
+                        }],
+                    }],
+                    "usage": {
+                        "input_tokens": 20,
+                        "output_tokens": 2,
+                        "total_tokens": 22,
+                    },
+                    "error": None,
+                    "incomplete_details": None,
+                    "metadata": {},
+                },
+            )
+
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client = AsyncOpenAI(api_key="test", http_client=http_client)
+        try:
+            with patch.dict(os.environ, {
+                "OPENAI_API_KEY": "test",
+                "OPENAI_MODEL": "gpt-5.6-terra",
+            }), patch("agent.brain.AsyncOpenAI", return_value=client):
+                producto = await identificar_producto_desde_imagen(
+                    b"imagen-de-prueba",
+                    "image/jpeg",
+                    safety_identifier="esc_prueba_vision",
+                )
+            self.assertEqual(producto, "Electroestimulador TENS")
         finally:
             await client.close()
 

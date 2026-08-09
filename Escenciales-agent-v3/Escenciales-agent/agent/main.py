@@ -15,6 +15,7 @@ from agent.audio import transcribir_audio
 from agent.brain import (
     cargar_business_config,
     generar_respuesta,
+    identificar_producto_desde_imagen,
     obtener_mensaje_error,
     obtener_mensaje_fallback,
 )
@@ -51,6 +52,7 @@ PORT = int(os.getenv("PORT", 8000))
 
 _fragmentos_pendientes: dict[str, list] = {}
 _version_fragmentos: dict[str, int] = {}
+_productos_anuncio_cache: dict[str, str] = {}
 
 
 def _texto_con_contexto_anuncio(texto: str, producto: str | None) -> str:
@@ -125,6 +127,38 @@ def _mensaje_compra(producto: str | None, historial: list[dict]) -> str | None:
     return f"🛒 Puedes comprar{pronombre} directamente aquí:\n{url}"
 
 
+async def _resolver_producto_visual_anuncio(msg):
+    if msg.es_propio or msg.contexto_producto or not msg.contexto_media_url:
+        return msg
+    clave = msg.contexto_anuncio_id or hashlib.sha256(
+        msg.contexto_media_url.encode("utf-8")
+    ).hexdigest()
+    if producto := _productos_anuncio_cache.get(clave):
+        return replace(msg, contexto_producto=producto)
+    try:
+        contenido, mime_type = await proveedor.obtener_imagen_anuncio(msg)
+        identificador = hashlib.sha256(msg.telefono.encode()).hexdigest()[:32]
+        producto = await identificar_producto_desde_imagen(
+            contenido,
+            mime_type,
+            safety_identifier=f"esc_{identificador}",
+        )
+    except Exception as exc:
+        logger.warning(
+            "No se pudo leer miniatura de anuncio tipo=%s",
+            type(exc).__name__,
+        )
+        return msg
+    if not producto:
+        logger.info("Miniatura de anuncio sin producto reconocible")
+        return msg
+    if len(_productos_anuncio_cache) >= 100:
+        _productos_anuncio_cache.pop(next(iter(_productos_anuncio_cache)))
+    _productos_anuncio_cache[clave] = producto
+    logger.info("Producto de anuncio identificado visualmente: %s", producto)
+    return replace(msg, contexto_producto=producto)
+
+
 async def _esperar_fragmentos(msg):
     """Agrupa textos consecutivos del mismo contacto antes de responder."""
     # Meta puede entregar mensajes enviados seguidos con varios segundos de
@@ -185,7 +219,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.2.0",
+    version="3.2.1",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -197,7 +231,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.2.0"
+        "version": "3.2.1"
     }
 
 
@@ -215,6 +249,7 @@ async def procesar_mensajes(mensajes):
         return
     for msg in mensajes:
         try:
+            msg = await _resolver_producto_visual_anuncio(msg)
             evento_pre_registrado = False
             if not msg.es_propio and msg.tipo == "text":
                 lote = await _esperar_fragmentos(msg)
