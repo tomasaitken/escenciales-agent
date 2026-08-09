@@ -15,9 +15,11 @@ negocio:
   telefono: "+56 9 3866 3898"
   ubicacion_para_clientes: "Santiago de Chile"
   regla_ubicacion: >
-    Si preguntan dónde está ubicada la tienda, responde únicamente que está ubicada
-    en Santiago de Chile. Nunca entregues ni confirmes calle, numeración, departamento,
-    comuna específica ni dirección legal o administrativa.
+    Si preguntan dónde está ubicada la tienda, indica que es una tienda online ubicada
+    en Santiago de Chile, que hace envíos gratis a todo Chile y que el pago se realiza
+    contraentrega, al recibir. Cierra ofreciendo ayuda con el producto consultado o
+    preguntando qué producto le interesa. Nunca entregues ni confirmes calle,
+    numeración, departamento, comuna específica ni dirección legal o administrativa.
   fuente: "Sitio público chilessentials.cl"
   verificado_el: "2026-08-04"
 
@@ -263,16 +265,20 @@ guia_atencion_validada_por_propietaria:
     pide que el equipo ingrese el pedido, activar pedido asistido para que una persona
     continúe por el mismo chat; no repetir el número de WhatsApp.
   ubicacion_y_despacho: >
-    Decir que la tienda está en Santiago y despacha gratis a todo Chile. Preguntar
-    comuna solo cuando sirva para orientar el despacho o la instalación del producto.
+    Decir siempre que es una tienda online ubicada en Santiago, que despacha gratis
+    a todo Chile y que el pago es contraentrega, al recibir. Preguntar con qué producto
+    puede ayudar, salvo que ya esté identificado. Preguntar comuna solo cuando sirva
+    para orientar el despacho o la instalación del producto.
   cobertura_antena: >
     Explicar que canales y recepción dependen de la cobertura digital terrestre de
     la ubicación. Puede pedirse comuna o localidad para entender el contexto, pero
     no prometer una comprobación ni confirmar señal sin una fuente real.
   seguimiento_proactivo: >
-    No enviar seguimientos por iniciativa propia ni decir "vi que nos consultaste
-    hace unos días". Ese tipo de mensaje requiere un flujo separado, consentimiento,
-    historial comprobado y cumplimiento de las reglas de Meta.
+    Solo existe un seguimiento automático autorizado: después de entregar el enlace
+    oficial de compra, si el cliente no responde durante 15 minutos, preguntar una
+    sola vez si pudo avanzar o necesita ayuda con el formulario. Cualquier respuesta
+    del cliente, intervención humana o handoff cancela el seguimiento. No enviar otros
+    mensajes proactivos ni afirmar que consultó hace días.
 
 handoff:
   contacto: "Equipo ESENCIALES"

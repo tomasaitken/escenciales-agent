@@ -1,5 +1,16 @@
 # Cambios
 
+## 3.4.0 — 2026-08-09
+
+- Paridad comercial obligatoria entre WhatsApp, Messenger e Instagram.
+- Las preguntas de ubicación reciben una respuesta uniforme con Santiago, envío
+  gratis a todo Chile, pago contraentrega y una pregunta sobre el producto.
+- Seguimiento único 15 minutos después de entregar el enlace de compra, persistente
+  ante reinicios y cancelado automáticamente por respuesta del cliente, intervención
+  humana o handoff.
+- Los clientes con dificultad para comprar reciben una oferta de ayuda temprana y
+  el pedido asistido continúa por el mismo chat.
+
 ## 3.3.0 — 2026-08-09
 
 - Flujo comercial semiautomático: precio, envío gratis y pago al recibir aparecen

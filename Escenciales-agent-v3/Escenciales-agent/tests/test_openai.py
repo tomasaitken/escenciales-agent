@@ -34,8 +34,10 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("Juan XXIII", prompt)
         self.assertNotIn("5560", prompt)
-        self.assertIn('responde únicamente: "Estamos ubicados', prompt)
-        self.assertIn('en Santiago de Chile"', prompt)
+        self.assertIn("tienda online ubicada", prompt)
+        self.assertIn("Santiago de Chile", prompt)
+        self.assertIn("contraentrega", prompt)
+        self.assertIn("preguntando con qué producto", prompt)
         self.assertIn("envíos a todo Chile y también al extranjero", prompt)
 
     def test_prompt_mantiene_foco_en_el_producto_consultado(self):
@@ -67,8 +69,18 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("zonas rurales", prompt)
         self.assertIn("conexión estándar", prompt)
         self.assertIn("NO CONFIRMADO", prompt)
-        self.assertIn("No envíes seguimientos proactivos", prompt)
+        self.assertIn("único flujo autorizado", prompt)
+        self.assertIn("15 minutos", prompt)
+        self.assertIn("ayuda con el formulario", prompt)
         self.assertIn("no prometer una comprobación", prompt)
+
+    def test_prompt_exige_paridad_entre_canales(self):
+        for canal in ("whatsapp", "messenger", "instagram"):
+            with self.subTest(canal=canal):
+                prompt = cargar_system_prompt(canal)
+                self.assertIn("CONSISTENCIA OMNICANAL — REGLA OBLIGATORIA", prompt)
+                self.assertIn("exactamente el mismo criterio", prompt)
+                self.assertIn("Nunca respondas más corto", prompt)
 
     def test_bloquea_direccion_exacta_en_la_salida(self):
         respuesta = sanitizar_respuesta(

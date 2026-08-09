@@ -327,6 +327,97 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(generar.await_count, 1)
         self.assertEqual(generar.await_args.args[0], "hola\nkiero\nla antena")
 
+    async def test_ubicacion_tiene_el_mismo_estandar_en_los_tres_canales(self):
+        self.assertIsNotNone(
+            main._respuesta_ubicacion_comercial("¿De dónde son?", None)
+        )
+        self.assertIsNotNone(
+            main._respuesta_ubicacion_comercial("¿Tienen local?", None)
+        )
+        generar = AsyncMock(return_value="No debería usarse")
+        for canal in ("whatsapp", "messenger", "instagram"):
+            with self.subTest(canal=canal):
+                contacto = f"{canal}-{uuid.uuid4().hex[:10]}"
+                proveedor = ProveedorFalso()
+                mensaje = MensajeEntrante(
+                    telefono=contacto,
+                    texto="¿Dónde están ubicados?",
+                    mensaje_id="msg-" + uuid.uuid4().hex,
+                    es_propio=False,
+                    canal=canal,
+                )
+                with patch.object(main, "proveedor", proveedor), patch.object(
+                    main, "generar_respuesta", generar
+                ):
+                    await main.procesar_mensajes([mensaje])
+
+                self.assertEqual(len(proveedor.enviados), 1)
+                respuesta = proveedor.enviados[0][1]
+                self.assertIn("Santiago de Chile", respuesta)
+                self.assertIn("envíos gratis a todo Chile", respuesta)
+                self.assertIn("pago es contraentrega", respuesta)
+                self.assertIn("¿Con cuál producto", respuesta)
+
+        self.assertEqual(generar.await_count, 0)
+
+    async def test_ubicacion_con_producto_no_vuelve_a_preguntar_cual(self):
+        contacto = "ig-" + uuid.uuid4().hex[:10]
+        proveedor = ProveedorFalso()
+        mensaje = MensajeEntrante(
+            telefono=contacto,
+            texto="¿Dónde están ubicados?",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="instagram",
+            contexto_producto="Electroestimulador TENS",
+        )
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "generar_respuesta", AsyncMock(return_value="No debería usarse")
+        ):
+            await main.procesar_mensajes([mensaje])
+
+        respuesta = proveedor.enviados[0][1]
+        self.assertIn("electroestimulador TENS", respuesta)
+        self.assertNotIn("cuál producto", respuesta)
+
+    async def test_enlace_programa_seguimiento_y_nuevo_mensaje_lo_cancela(self):
+        contacto = "fb-" + uuid.uuid4().hex[:10]
+        proveedor = ProveedorFalso()
+        compra = MensajeEntrante(
+            telefono=contacto,
+            texto="Quiero comprar la antena",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="messenger",
+            contexto_producto="Antena Digital Full HD 4K",
+        )
+        programar = AsyncMock()
+        cancelar = AsyncMock(return_value=0)
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "generar_respuesta", AsyncMock(return_value="Claro, te ayudo.")
+        ), patch.object(
+            main, "programar_seguimiento_compra", programar
+        ), patch.object(
+            main, "cancelar_seguimientos_compra", cancelar
+        ), patch.dict(os.environ, {
+            "PURCHASE_FOLLOWUP_ENABLED": "true",
+            "PURCHASE_FOLLOWUP_MINUTES": "15",
+        }):
+            await main.procesar_mensajes([compra])
+
+        self.assertEqual(len(proveedor.enviados), 2)
+        self.assertIn("53910086058352", proveedor.enviados[1][1])
+        programar.assert_awaited_once_with(
+            f"messenger:{contacto}",
+            "messenger",
+            contacto,
+            "Antena Digital Full HD 4K",
+            minutos=15.0,
+        )
+        cancelar.assert_awaited_once_with(f"messenger:{contacto}")
+
 
 if __name__ == "__main__":
     unittest.main()

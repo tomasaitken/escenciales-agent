@@ -9,12 +9,17 @@ from agent.memory import (  # noqa: E402
     EventoEntrante,
     HandoffTicket,
     Mensaje,
+    cancelar_seguimientos_compra,
     conversacion_pausada,
     crear_handoff,
+    finalizar_seguimiento_compra,
     inicializar_db,
     listar_handoffs,
+    programar_seguimiento_compra,
     purgar_datos_antiguos,
+    reclamar_seguimientos_vencidos,
     resolver_handoff,
+    seguimiento_compra_activo,
 )
 
 
@@ -52,6 +57,40 @@ class HandoffPersistenciaTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(all(columna.type.timezone for columna in columnas))
         await purgar_datos_antiguos(90)
+
+    async def test_seguimiento_se_programa_reclama_y_finaliza_una_sola_vez(self):
+        conversacion = f"messenger:{uuid.uuid4().hex}"
+        creado = await programar_seguimiento_compra(
+            conversacion,
+            "messenger",
+            "cliente-prueba",
+            "Antena Digital Full HD 4K",
+            minutos=0,
+        )
+
+        vencidos = await reclamar_seguimientos_vencidos()
+        seguimiento = next(item for item in vencidos if item["id"] == creado["id"])
+        self.assertEqual(seguimiento["estado"], "procesando")
+        self.assertTrue(await seguimiento_compra_activo(creado["id"]))
+
+        await finalizar_seguimiento_compra(creado["id"], True)
+        self.assertFalse(await seguimiento_compra_activo(creado["id"]))
+        segunda_revision = await reclamar_seguimientos_vencidos()
+        self.assertFalse(any(item["id"] == creado["id"] for item in segunda_revision))
+
+    async def test_respuesta_del_cliente_cancela_el_seguimiento(self):
+        conversacion = f"instagram:{uuid.uuid4().hex}"
+        creado = await programar_seguimiento_compra(
+            conversacion,
+            "instagram",
+            "cliente-prueba",
+            "Cabezal de ducha",
+            minutos=0,
+        )
+
+        self.assertEqual(await cancelar_seguimientos_compra(conversacion), 1)
+        vencidos = await reclamar_seguimientos_vencidos()
+        self.assertFalse(any(item["id"] == creado["id"] for item in vencidos))
 
 
 if __name__ == "__main__":

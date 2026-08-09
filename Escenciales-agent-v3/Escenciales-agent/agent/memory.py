@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, DateTime, select, Integer, delete
+from sqlalchemy import String, Text, DateTime, select, Integer, delete, update
 from sqlalchemy.exc import IntegrityError
 from dotenv import load_dotenv
 
@@ -91,6 +91,25 @@ class HandoffTicket(Base):
     )
 
 
+class SeguimientoCompra(Base):
+    __tablename__ = "seguimientos_compra"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    conversacion_id: Mapped[str] = mapped_column(String(255), index=True)
+    canal: Mapped[str] = mapped_column(String(30))
+    contacto: Mapped[str] = mapped_column(String(255))
+    producto: Mapped[str] = mapped_column(String(150))
+    estado: Mapped[str] = mapped_column(String(30), default="pendiente", index=True)
+    intentos: Mapped[int] = mapped_column(Integer, default=0)
+    enviar_despues: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    creado: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    actualizado: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 async def inicializar_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -133,6 +152,119 @@ async def limpiar_historial(telefono: str):
         mensajes = result.scalars().all()
         for msg in mensajes:
             await session.delete(msg)
+        await session.commit()
+
+
+def _seguimiento_dict(seguimiento: SeguimientoCompra) -> dict:
+    return {
+        "id": seguimiento.id,
+        "conversacion_id": seguimiento.conversacion_id,
+        "canal": seguimiento.canal,
+        "contacto": seguimiento.contacto,
+        "producto": seguimiento.producto,
+        "estado": seguimiento.estado,
+        "intentos": seguimiento.intentos,
+        "enviar_despues": seguimiento.enviar_despues,
+    }
+
+
+async def programar_seguimiento_compra(
+    conversacion_id: str,
+    canal: str,
+    contacto: str,
+    producto: str,
+    minutos: float = 15,
+) -> dict:
+    """Programa un solo recordatorio tras enviar el checkout."""
+    ahora = datetime.now(timezone.utc)
+    async with async_session() as session:
+        await session.execute(
+            update(SeguimientoCompra)
+            .where(SeguimientoCompra.conversacion_id == conversacion_id)
+            .where(SeguimientoCompra.estado.in_(("pendiente", "procesando")))
+            .values(estado="cancelado", actualizado=ahora)
+        )
+        seguimiento = SeguimientoCompra(
+            id=str(uuid.uuid4()),
+            conversacion_id=conversacion_id,
+            canal=canal,
+            contacto=contacto,
+            producto=producto,
+            estado="pendiente",
+            intentos=0,
+            enviar_despues=ahora + timedelta(minutes=max(0, minutos)),
+            creado=ahora,
+            actualizado=ahora,
+        )
+        session.add(seguimiento)
+        await session.commit()
+        return _seguimiento_dict(seguimiento)
+
+
+async def cancelar_seguimientos_compra(conversacion_id: str) -> int:
+    """Cancela recordatorios cuando responde el cliente o interviene el equipo."""
+    ahora = datetime.now(timezone.utc)
+    async with async_session() as session:
+        resultado = await session.execute(
+            update(SeguimientoCompra)
+            .where(SeguimientoCompra.conversacion_id == conversacion_id)
+            .where(SeguimientoCompra.estado.in_(("pendiente", "procesando")))
+            .values(estado="cancelado", actualizado=ahora)
+        )
+        await session.commit()
+        return int(resultado.rowcount or 0)
+
+
+async def reclamar_seguimientos_vencidos(limite: int = 20) -> list[dict]:
+    """Reserva recordatorios vencidos para evitar envíos duplicados."""
+    ahora = datetime.now(timezone.utc)
+    async with async_session() as session:
+        await session.execute(
+            update(SeguimientoCompra)
+            .where(SeguimientoCompra.estado == "procesando")
+            .where(SeguimientoCompra.actualizado < ahora - timedelta(minutes=10))
+            .values(estado="pendiente", actualizado=ahora)
+        )
+        resultado = await session.execute(
+            select(SeguimientoCompra)
+            .where(SeguimientoCompra.estado == "pendiente")
+            .where(SeguimientoCompra.enviar_despues <= ahora)
+            .order_by(SeguimientoCompra.enviar_despues.asc())
+            .limit(min(max(limite, 1), 100))
+            .with_for_update(skip_locked=True)
+        )
+        seguimientos = list(resultado.scalars().all())
+        for seguimiento in seguimientos:
+            seguimiento.estado = "procesando"
+            seguimiento.intentos += 1
+            seguimiento.actualizado = ahora
+        await session.commit()
+        return [_seguimiento_dict(item) for item in seguimientos]
+
+
+async def seguimiento_compra_activo(seguimiento_id: str) -> bool:
+    async with async_session() as session:
+        seguimiento = await session.get(SeguimientoCompra, seguimiento_id)
+        return bool(seguimiento and seguimiento.estado == "procesando")
+
+
+async def finalizar_seguimiento_compra(
+    seguimiento_id: str,
+    enviado: bool,
+) -> None:
+    ahora = datetime.now(timezone.utc)
+    async with async_session() as session:
+        seguimiento = await session.get(SeguimientoCompra, seguimiento_id)
+        if not seguimiento or seguimiento.estado != "procesando":
+            return
+        if enviado:
+            seguimiento.estado = "enviado"
+        elif seguimiento.intentos < 3:
+            seguimiento.estado = "pendiente"
+            seguimiento.enviar_despues = ahora + timedelta(minutes=5)
+        else:
+            seguimiento.estado = "fallido"
+        seguimiento.actualizado = ahora
         await session.commit()
 
 
@@ -276,5 +408,14 @@ async def purgar_datos_antiguos(dias: int) -> None:
             delete(HandoffTicket)
             .where(HandoffTicket.actualizado < limite)
             .where(HandoffTicket.estado == "resuelto")
+        )
+        await session.execute(
+            delete(SeguimientoCompra)
+            .where(SeguimientoCompra.actualizado < limite)
+            .where(
+                SeguimientoCompra.estado.in_(
+                    ("enviado", "cancelado", "fallido")
+                )
+            )
         )
         await session.commit()

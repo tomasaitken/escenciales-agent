@@ -5,6 +5,7 @@ import hashlib
 import re
 import unicodedata
 from contextlib import asynccontextmanager
+from contextlib import suppress
 from dataclasses import replace
 from fastapi import BackgroundTasks, FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -22,13 +23,18 @@ from agent.brain import (
 from agent.handoff import detectar_handoff, mensaje_handoff, respuesta_promete_handoff
 from agent.legal import router as legal_router
 from agent.memory import (
+    cancelar_seguimientos_compra,
     conversacion_pausada,
     crear_handoff,
+    finalizar_seguimiento_compra,
     inicializar_db,
     guardar_mensaje,
     obtener_historial,
+    programar_seguimiento_compra,
     purgar_datos_antiguos,
+    reclamar_seguimientos_vencidos,
     registrar_evento_si_nuevo,
+    seguimiento_compra_activo,
 )
 from agent.notifier import notificar_handoff
 from agent.providers import obtener_proveedor
@@ -96,6 +102,38 @@ def _producto_de_conversacion(
         if producto:
             return producto
     return None
+
+
+def _respuesta_ubicacion_comercial(
+    texto: str,
+    producto: str | None,
+) -> str | None:
+    """Evita respuestas secas o distintas por canal ante preguntas de ubicación."""
+    normalizado = _normalizar(texto)
+    patrones = (
+        r"\bdonde\s+(estan|se ubican|quedan|queda|esta)\b",
+        r"\b(ubicacion|ubicados|direccion|tienda fisica|local fisico)\b",
+        r"\bde que (comuna|ciudad|parte) son\b",
+        r"\bde donde son\b",
+        r"\bson de (santiago|que comuna|que ciudad)\b",
+        r"\b(tienen|hay) (tienda|local)\b",
+    )
+    if not any(re.search(patron, normalizado) for patron in patrones):
+        return None
+
+    preguntas = {
+        "Antena Digital Full HD 4K": "¿Qué te gustaría saber sobre la antena?",
+        "Cabezal de ducha": "¿Qué te gustaría saber sobre la ducha?",
+        "Electroestimulador TENS": (
+            "¿Qué te gustaría saber sobre el electroestimulador TENS?"
+        ),
+    }
+    cierre = preguntas.get(producto, "¿Con cuál producto te puedo ayudar?")
+    return (
+        "Somos una tienda online ubicada en Santiago de Chile 😊 Hacemos envíos "
+        "gratis a todo Chile y el pago es contraentrega: pagas cuando recibes "
+        f"el producto. {cierre}"
+    )
 
 
 def _url_compra(producto: str | None) -> str | None:
@@ -167,6 +205,56 @@ def _debe_enviar_enlace(texto: str, historial: list[dict]) -> bool:
         )
         and "?" in ultima_respuesta
     )
+
+
+def _seguimientos_habilitados() -> bool:
+    return os.getenv("PURCHASE_FOLLOWUP_ENABLED", "true").strip().lower() in {
+        "1", "true", "yes", "si", "sí", "on",
+    }
+
+
+def _mensaje_seguimiento_compra(producto: str) -> str:
+    nombres = {
+        "Antena Digital Full HD 4K": "la antena",
+        "Cabezal de ducha": "la ducha",
+        "Electroestimulador TENS": "el electroestimulador TENS",
+    }
+    nombre = nombres.get(producto, "el producto")
+    return (
+        f"¿Pudiste avanzar con la compra de {nombre}? 😊 Si necesitas ayuda "
+        "con el formulario o prefieres que una persona del equipo te ayude, "
+        "dime y seguimos por este mismo chat."
+    )
+
+
+async def _procesar_seguimientos_vencidos() -> None:
+    for seguimiento in await reclamar_seguimientos_vencidos():
+        try:
+            conversacion_id = seguimiento["conversacion_id"]
+            if await conversacion_pausada(conversacion_id):
+                await cancelar_seguimientos_compra(conversacion_id)
+                continue
+            if not await seguimiento_compra_activo(seguimiento["id"]):
+                continue
+            mensaje = _mensaje_seguimiento_compra(seguimiento["producto"])
+            enviado = await proveedor.enviar_mensaje(
+                seguimiento["contacto"],
+                mensaje,
+                canal=seguimiento["canal"],
+            )
+            if enviado:
+                await guardar_mensaje(conversacion_id, "assistant", mensaje)
+            await finalizar_seguimiento_compra(seguimiento["id"], enviado)
+        except Exception:
+            logger.exception("Error procesando seguimiento de compra")
+            await finalizar_seguimiento_compra(seguimiento["id"], False)
+
+
+async def _bucle_seguimientos_compra() -> None:
+    intervalo = max(2.0, float(os.getenv("PURCHASE_FOLLOWUP_POLL_SECONDS", "10")))
+    while True:
+        await _procesar_seguimientos_vencidos()
+        await asyncio.sleep(intervalo)
 
 
 async def _resolver_producto_visual_anuncio(msg):
@@ -256,12 +344,25 @@ async def lifespan(app: FastAPI):
     logger.info(f"  Puerto: {PORT}")
     logger.info(f"  Entorno: {ENVIRONMENT}")
     logger.info("=" * 50)
-    yield
+    tarea_seguimientos = None
+    if _seguimientos_habilitados():
+        tarea_seguimientos = asyncio.create_task(_bucle_seguimientos_compra())
+        logger.info(
+            "Seguimiento de compra activo demora_min=%s",
+            os.getenv("PURCHASE_FOLLOWUP_MINUTES", "15"),
+        )
+    try:
+        yield
+    finally:
+        if tarea_seguimientos:
+            tarea_seguimientos.cancel()
+            with suppress(asyncio.CancelledError):
+                await tarea_seguimientos
 
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.3.0",
+    version="3.4.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -273,7 +374,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.3.0"
+        "version": "3.4.0"
     }
 
 
@@ -331,6 +432,7 @@ async def procesar_mensajes(mensajes):
                     continue
 
                 conversacion_id = f"{msg.canal}:{msg.telefono}"
+                await cancelar_seguimientos_compra(conversacion_id)
                 texto_manual = msg.texto.strip() or "[Respuesta manual del equipo]"
                 await guardar_mensaje(conversacion_id, "assistant", texto_manual)
                 await crear_handoff(
@@ -355,6 +457,7 @@ async def procesar_mensajes(mensajes):
             logger.info("Mensaje entrante [%s] contacto=%s", msg.canal, contacto_hash)
 
             conversacion_id = f"{msg.canal}:{msg.telefono}"
+            await cancelar_seguimientos_compra(conversacion_id)
             texto = msg.texto.strip()
 
             if msg.tipo == "audio":
@@ -456,12 +559,17 @@ async def procesar_mensajes(mensajes):
             producto_conversacion = _producto_de_conversacion(
                 msg.contexto_producto, texto, historial
             )
-            respuesta = await generar_respuesta(
-                texto_para_modelo,
-                historial,
-                canal=msg.canal,
-                safety_identifier=f"esc_{hash_completo[:32]}",
+            respuesta = _respuesta_ubicacion_comercial(
+                texto,
+                producto_conversacion,
             )
+            if not respuesta:
+                respuesta = await generar_respuesta(
+                    texto_para_modelo,
+                    historial,
+                    canal=msg.canal,
+                    safety_identifier=f"esc_{hash_completo[:32]}",
+                )
 
             ticket_modelo = None
             if respuesta_promete_handoff(respuesta):
@@ -501,6 +609,16 @@ async def procesar_mensajes(mensajes):
                         await guardar_mensaje(
                             conversacion_id, "assistant", mensaje_compra
                         )
+                        if _seguimientos_habilitados():
+                            await programar_seguimiento_compra(
+                                conversacion_id,
+                                msg.canal,
+                                msg.telefono,
+                                producto_conversacion,
+                                minutos=float(
+                                    os.getenv("PURCHASE_FOLLOWUP_MINUTES", "15")
+                                ),
+                            )
                     else:
                         logger.error(
                             "No se pudo enviar enlace de compra contacto=%s",
