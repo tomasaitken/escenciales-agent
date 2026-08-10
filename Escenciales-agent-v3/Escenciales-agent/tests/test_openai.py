@@ -84,7 +84,7 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
 
     def test_prompt_distingue_antena_amplificada_de_antena_normal(self):
         prompt = cargar_system_prompt("whatsapp")
-        self.assertIn("amplificada y de alta potencia", prompt)
+        self.assertIn("amplificador de señal de alta potencia", prompt)
         self.assertIn("señales digitales débiles mejor", prompt)
         self.assertIn("misma cobertura que una antena normal", prompt)
         self.assertIn("no llega señal alguna", prompt)
