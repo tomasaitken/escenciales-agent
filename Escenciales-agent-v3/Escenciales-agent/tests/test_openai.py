@@ -82,6 +82,13 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("exactamente el mismo criterio", prompt)
                 self.assertIn("Nunca respondas más corto", prompt)
 
+    def test_prompt_distingue_antena_amplificada_de_antena_normal(self):
+        prompt = cargar_system_prompt("whatsapp")
+        self.assertIn("amplificada y de alta potencia", prompt)
+        self.assertIn("señales digitales débiles mejor", prompt)
+        self.assertIn("misma cobertura que una antena normal", prompt)
+        self.assertIn("no llega señal alguna", prompt)
+
     def test_bloquea_direccion_exacta_en_la_salida(self):
         respuesta = sanitizar_respuesta(
             "Estamos en calle Juan XXIII 5560, Santiago."
@@ -168,7 +175,7 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
             body = json.loads(request.content)
             contenido = body["input"][0]["content"]
             self.assertEqual(contenido[1]["type"], "input_image")
-            self.assertEqual(contenido[1]["detail"], "low")
+            self.assertEqual(contenido[1]["detail"], "high")
             self.assertTrue(
                 contenido[1]["image_url"].startswith("data:image/jpeg;base64,")
             )
@@ -188,7 +195,7 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
                         "role": "assistant",
                         "content": [{
                             "type": "output_text",
-                            "text": "TENS",
+                            "text": "TENS|0.98",
                             "annotations": [],
                         }],
                     }],
@@ -216,6 +223,56 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
                     safety_identifier="esc_prueba_vision",
                 )
             self.assertEqual(producto, "Electroestimulador TENS")
+        finally:
+            await client.close()
+
+    async def test_descarta_producto_visual_con_baja_confianza(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "id": "resp_vision_low",
+                    "object": "response",
+                    "created_at": 1,
+                    "status": "completed",
+                    "model": "gpt-5.6-terra",
+                    "output": [{
+                        "id": "msg_vision_low",
+                        "type": "message",
+                        "status": "completed",
+                        "role": "assistant",
+                        "content": [{
+                            "type": "output_text",
+                            "text": "DUCHA|0.62",
+                            "annotations": [],
+                        }],
+                    }],
+                    "usage": {
+                        "input_tokens": 20,
+                        "output_tokens": 3,
+                        "total_tokens": 23,
+                    },
+                    "error": None,
+                    "incomplete_details": None,
+                    "metadata": {},
+                },
+            )
+
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client = AsyncOpenAI(api_key="test", http_client=http_client)
+        try:
+            with patch.dict(os.environ, {
+                "OPENAI_API_KEY": "test",
+                "OPENAI_MODEL": "gpt-5.6-terra",
+                "AD_PRODUCT_CONFIDENCE_MIN": "0.88",
+            }), patch("agent.brain.AsyncOpenAI", return_value=client):
+                producto = await identificar_producto_desde_imagen(
+                    b"imagen-dudosa",
+                    "image/jpeg",
+                    safety_identifier="esc_prueba_vision_dudosa",
+                )
+            self.assertIsNone(producto)
         finally:
             await client.close()
 

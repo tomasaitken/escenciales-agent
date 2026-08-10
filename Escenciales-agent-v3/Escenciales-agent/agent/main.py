@@ -91,12 +91,18 @@ def _producto_de_conversacion(
     contexto_producto: str | None,
     texto: str,
     historial: list[dict],
+    nuevo_contexto_anuncio: bool = False,
 ) -> str | None:
     if contexto_producto:
         return contexto_producto
     producto = _producto_desde_texto(texto)
     if producto:
         return producto
+    # Un clic nuevo en un anuncio abre un contexto comercial nuevo. Si Meta y la
+    # miniatura no permiten identificarlo, nunca heredar el producto de mensajes
+    # anteriores de ese mismo contacto.
+    if nuevo_contexto_anuncio:
+        return None
     for mensaje in reversed(historial):
         producto = _producto_desde_texto(str(mensaje.get("content", "")))
         if producto:
@@ -258,17 +264,21 @@ async def _bucle_seguimientos_compra() -> None:
 
 
 async def _resolver_producto_visual_anuncio(msg):
-    if msg.es_propio or msg.contexto_producto or not msg.contexto_media_url:
+    if msg.es_propio or not msg.contexto_media_url:
         return msg
     clave = msg.contexto_anuncio_id or hashlib.sha256(
         msg.contexto_media_url.encode("utf-8")
     ).hexdigest()
-    if producto := _productos_anuncio_cache.get(clave):
-        return replace(msg, contexto_producto=producto)
+    producto_visual = _productos_anuncio_cache.get(clave)
+    if producto_visual:
+        if msg.contexto_producto and msg.contexto_producto != producto_visual:
+            logger.warning("Conflicto entre metadatos y miniatura de anuncio")
+            return replace(msg, contexto_producto=None)
+        return replace(msg, contexto_producto=producto_visual)
     try:
         contenido, mime_type = await proveedor.obtener_imagen_anuncio(msg)
         identificador = hashlib.sha256(msg.telefono.encode()).hexdigest()[:32]
-        producto = await identificar_producto_desde_imagen(
+        producto_visual = await identificar_producto_desde_imagen(
             contenido,
             mime_type,
             safety_identifier=f"esc_{identificador}",
@@ -279,14 +289,17 @@ async def _resolver_producto_visual_anuncio(msg):
             type(exc).__name__,
         )
         return msg
-    if not producto:
+    if not producto_visual:
         logger.info("Miniatura de anuncio sin producto reconocible")
         return msg
+    if msg.contexto_producto and msg.contexto_producto != producto_visual:
+        logger.warning("Conflicto entre metadatos y miniatura de anuncio")
+        return replace(msg, contexto_producto=None)
     if len(_productos_anuncio_cache) >= 100:
         _productos_anuncio_cache.pop(next(iter(_productos_anuncio_cache)))
-    _productos_anuncio_cache[clave] = producto
-    logger.info("Producto de anuncio identificado visualmente: %s", producto)
-    return replace(msg, contexto_producto=producto)
+    _productos_anuncio_cache[clave] = producto_visual
+    logger.info("Producto de anuncio identificado visualmente: %s", producto_visual)
+    return replace(msg, contexto_producto=producto_visual)
 
 
 async def _esperar_fragmentos(msg):
@@ -362,7 +375,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.4.0",
+    version="3.5.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -374,7 +387,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.4.0"
+        "version": "3.5.0"
     }
 
 
@@ -416,11 +429,29 @@ async def procesar_mensajes(mensajes):
                     ),
                     None,
                 )
+                contexto_media_url = next(
+                    (
+                        parte.contexto_media_url
+                        for parte in partes_nuevas
+                        if parte.contexto_media_url
+                    ),
+                    None,
+                )
+                contexto_anuncio_id = next(
+                    (
+                        parte.contexto_anuncio_id
+                        for parte in partes_nuevas
+                        if parte.contexto_anuncio_id
+                    ),
+                    None,
+                )
                 msg = replace(
                     partes_nuevas[-1],
                     texto=texto_unido,
                     mensaje_id="",
                     contexto_producto=contexto_producto,
+                    contexto_media_url=contexto_media_url,
+                    contexto_anuncio_id=contexto_anuncio_id,
                 )
                 evento_pre_registrado = True
 
@@ -556,20 +587,33 @@ async def procesar_mensajes(mensajes):
                 continue
 
             historial = await obtener_historial(conversacion_id)
+            nuevo_contexto_anuncio = bool(
+                msg.contexto_media_url or msg.contexto_anuncio_id
+            )
             producto_conversacion = _producto_de_conversacion(
-                msg.contexto_producto, texto, historial
+                msg.contexto_producto,
+                texto,
+                historial,
+                nuevo_contexto_anuncio=nuevo_contexto_anuncio,
             )
             respuesta = _respuesta_ubicacion_comercial(
                 texto,
                 producto_conversacion,
             )
             if not respuesta:
-                respuesta = await generar_respuesta(
-                    texto_para_modelo,
-                    historial,
-                    canal=msg.canal,
-                    safety_identifier=f"esc_{hash_completo[:32]}",
-                )
+                if nuevo_contexto_anuncio and not producto_conversacion:
+                    respuesta = (
+                        "Quiero asegurarme de darte la información correcta 😊 "
+                        "¿El anuncio que viste es de la antena HD, el "
+                        "electroestimulador TENS o la ducha?"
+                    )
+                else:
+                    respuesta = await generar_respuesta(
+                        texto_para_modelo,
+                        historial,
+                        canal=msg.canal,
+                        safety_identifier=f"esc_{hash_completo[:32]}",
+                    )
 
             ticket_modelo = None
             if respuesta_promete_handoff(respuesta):

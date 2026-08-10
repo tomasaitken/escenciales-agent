@@ -16,40 +16,62 @@ logger = logging.getLogger(__name__)
 
 
 def _producto_desde_referencia_anuncio(referencia: object) -> str | None:
-    """Identifica el producto anunciado sin guardar ni exponer datos del anuncio."""
+    """Identifica el producto solo cuando la referencia publicitaria es inequívoca."""
     if not isinstance(referencia, dict):
         return None
 
-    campos = (
-        "headline", "body", "source_url", "source_type",
-        "source_id", "ad_id", "ref", "referer_uri",
-    )
-    contenido = " ".join(str(referencia.get(campo, "")) for campo in campos)
-    contenido = unicodedata.normalize("NFKD", contenido)
-    contenido = "".join(
-        caracter
-        for caracter in contenido
-        if not unicodedata.combining(caracter)
-    ).lower()
+    def normalizar(valor: object) -> str:
+        texto = unicodedata.normalize("NFKD", str(valor or ""))
+        return "".join(
+            caracter for caracter in texto
+            if not unicodedata.combining(caracter)
+        ).lower()
 
-    patrones = (
-        (
-            r"\b(antena|tv\s*cable|television|canales?|full\s*hd|4k|senal)\b",
-            "Antena Digital Full HD 4K",
+    # Título y URL son más confiables que el cuerpo general del anuncio. Los IDs y
+    # source_type no contienen evidencia útil sobre el producto.
+    pesos = {
+        "headline": 5,
+        "source_url": 4,
+        "referer_uri": 4,
+        "body": 3,
+        "ref": 3,
+    }
+    patrones = {
+        "Antena Digital Full HD 4K": (
+            r"\bantena\b",
+            r"\btv\s*cable\b",
+            r"\btelevision\s+digital\b",
+            r"\bcanales?\s+(?:nacionales|digitales|hd)\b",
+            r"\bfull[\s_-]*hd[\s_-]*4k\b",
         ),
-        (
-            r"\b(ducha|cabezal|presion\s+de\s+agua|filtro\s+de\s+agua)\b",
-            "Cabezal de ducha",
+        "Cabezal de ducha": (
+            r"\bducha\b",
+            r"\bcabezal(?:\s+de)?\s+ducha\b",
+            r"\bpresion\s+(?:de\s+)?agua\b",
+            r"\bducha\s+masajeadora\b",
         ),
-        (
-            r"\b(electroestimulador|tens|electrodos?|dolor\s+muscular|terapia\s+muscular)\b",
-            "Electroestimulador TENS",
+        "Electroestimulador TENS": (
+            r"\belectroestimulador\b",
+            r"\btens\b",
+            r"\belectrodos?\b",
+            r"\bterapia\s+muscular\b",
         ),
-    )
-    return next(
-        (producto for patron, producto in patrones if re.search(patron, contenido)),
-        None,
-    )
+    }
+    puntajes = {producto: 0 for producto in patrones}
+    for campo, peso in pesos.items():
+        contenido = normalizar(referencia.get(campo, ""))
+        for producto, expresiones in patrones.items():
+            coincidencias = sum(
+                bool(re.search(expresion, contenido))
+                for expresion in expresiones
+            )
+            puntajes[producto] += peso * coincidencias
+
+    ordenados = sorted(puntajes.items(), key=lambda item: item[1], reverse=True)
+    (producto, puntaje), (_, segundo) = ordenados[:2]
+    if puntaje < 4 or puntaje - segundo < 2:
+        return None
+    return producto
 
 
 def _datos_media_referencia_anuncio(

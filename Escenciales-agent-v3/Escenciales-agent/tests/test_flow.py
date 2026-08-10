@@ -303,6 +303,76 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
             "Hola, quiero más información",
         )
 
+    async def test_anuncio_nuevo_dudoso_no_hereda_producto_anterior(self):
+        contacto = "569" + uuid.uuid4().hex[:8]
+        proveedor = ProveedorFalso()
+        mensaje = MensajeEntrante(
+            telefono=contacto,
+            texto="Hola, quiero más información",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+            contexto_media_url="https://scontent.xx.fbcdn.net/anuncio-dudoso.jpg",
+            contexto_anuncio_id="anuncio-nuevo-dudoso",
+        )
+        historial_anterior = [{
+            "role": "assistant",
+            "content": "La ducha cuesta $23.990.",
+        }]
+        generar = AsyncMock(return_value="No debería adivinar el producto")
+
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main, "identificar_producto_desde_imagen", AsyncMock(return_value=None)
+        ), patch.object(
+            main, "obtener_historial", AsyncMock(return_value=historial_anterior)
+        ), patch.object(main, "generar_respuesta", generar):
+            await main.procesar_mensajes([mensaje])
+
+        generar.assert_not_awaited()
+        self.assertEqual(len(proveedor.enviados), 1)
+        respuesta = proveedor.enviados[0][1]
+        self.assertIn("asegurarme", respuesta)
+        self.assertIn("antena HD", respuesta)
+        self.assertIn("electroestimulador TENS", respuesta)
+        self.assertIn("ducha", respuesta)
+        self.assertNotIn("$23.990", respuesta)
+
+    async def test_conflicto_miniatura_metadatos_no_elije_ninguno(self):
+        mensaje = MensajeEntrante(
+            telefono="569" + uuid.uuid4().hex[:8],
+            texto="Más información",
+            mensaje_id="msg-" + uuid.uuid4().hex,
+            es_propio=False,
+            canal="whatsapp",
+            contexto_producto="Cabezal de ducha",
+            contexto_media_url="https://scontent.xx.fbcdn.net/tens.jpg",
+            contexto_anuncio_id="anuncio-conflictivo",
+        )
+        proveedor = ProveedorFalso()
+        with patch.object(main, "proveedor", proveedor), patch.object(
+            main,
+            "identificar_producto_desde_imagen",
+            AsyncMock(return_value="Electroestimulador TENS"),
+        ):
+            resuelto = await main._resolver_producto_visual_anuncio(mensaje)
+
+        self.assertIsNone(resuelto.contexto_producto)
+
+    def test_producto_anterior_solo_se_reutiliza_sin_anuncio_nuevo(self):
+        historial = [{"role": "assistant", "content": "Te cuento sobre la ducha."}]
+        self.assertEqual(
+            main._producto_de_conversacion(None, "¿Y el precio?", historial),
+            "Cabezal de ducha",
+        )
+        self.assertIsNone(
+            main._producto_de_conversacion(
+                None,
+                "Quiero más información",
+                historial,
+                nuevo_contexto_anuncio=True,
+            )
+        )
+
     async def test_fragmentos_en_un_mismo_webhook_tambien_se_agrupan(self):
         contacto = "569" + uuid.uuid4().hex[:8]
         proveedor = ProveedorFalso()

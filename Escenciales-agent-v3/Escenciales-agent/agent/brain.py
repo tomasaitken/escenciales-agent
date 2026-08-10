@@ -19,8 +19,9 @@ CANAL_LABELS = {
 }
 
 RESPUESTA_UBICACION_SEGURA = (
-    "Estamos ubicados en Santiago de Chile. Hacemos envíos a todo Chile y también "
-    "al extranjero. Si me dices tu ciudad o país, te ayudo con el despacho."
+    "Somos una tienda online ubicada en Santiago de Chile 😊 Hacemos envíos gratis "
+    "a todo Chile y el pago es contraentrega: pagas cuando recibes el producto. "
+    "También hacemos envíos al extranjero, previa confirmación de las condiciones."
 )
 
 PATRONES_DIRECCION_NO_PUBLICABLE = (
@@ -185,25 +186,52 @@ async def identificar_producto_desde_imagen(
         response = await client.responses.create(
             model=os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
             instructions=(
-                "Clasifica esta miniatura de un anuncio de la tienda Escenciales. "
-                "Responde exactamente con una de estas cuatro etiquetas, sin explicar: "
-                "TENS, ANTENA, DUCHA o DESCONOCIDO. Usa TENS si aparece un "
-                "electroestimulador con electrodos; ANTENA si aparece una antena de TV; "
-                "DUCHA si aparece un cabezal de ducha. Si no es claro, DESCONOCIDO."
+                "Clasifica el producto PRINCIPAL de esta miniatura publicitaria de "
+                "Escenciales. No clasifiques por colores, iconos decorativos, fondo ni "
+                "elementos de la interfaz. TENS exige ver el controlador con cables, "
+                "parches/electrodos o texto explícito de electroestimulación/TENS. "
+                "ANTENA exige hardware de antena/cable/amplificador o texto explícito "
+                "de antena, TV o canales. DUCHA exige ver un cabezal/chorro de ducha o "
+                "texto explícito de ducha. Si aparecen varios productos, la evidencia "
+                "es insuficiente o el producto principal no es claro, usa DESCONOCIDO. "
+                "Responde solo ETIQUETA|CONFIANZA, por ejemplo ANTENA|0.97. Las únicas "
+                "etiquetas válidas son TENS, ANTENA, DUCHA y DESCONOCIDO."
             ),
             input=[{
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": "Identifica el producto anunciado."},
-                    {"type": "input_image", "image_url": data_url, "detail": "low"},
+                    {"type": "input_image", "image_url": data_url, "detail": "high"},
                 ],
             }],
-            max_output_tokens=80,
+            max_output_tokens=30,
             reasoning={"effort": "low"},
             safety_identifier=safety_identifier,
             store=False,
         )
-        etiqueta = re.sub(r"[^a-z]", "", response.output_text.lower())
+        resultado = re.fullmatch(
+            r"\s*(TENS|ANTENA|DUCHA|DESCONOCIDO)\s*\|\s*"
+            r"(0(?:\.\d+)?|1(?:\.0+)?)\s*",
+            response.output_text,
+            flags=re.IGNORECASE,
+        )
+        if not resultado:
+            logger.info("Clasificación visual descartada por formato inválido")
+            return None
+        etiqueta = resultado.group(1).lower()
+        confianza = float(resultado.group(2))
+        umbral = min(
+            1.0,
+            max(0.0, float(os.getenv("AD_PRODUCT_CONFIDENCE_MIN", "0.88"))),
+        )
+        logger.info(
+            "Clasificación visual producto=%s confianza=%.2f umbral=%.2f",
+            etiqueta,
+            confianza,
+            umbral,
+        )
+        if etiqueta == "desconocido" or confianza < umbral:
+            return None
         return {
             "tens": "Electroestimulador TENS",
             "antena": "Antena Digital Full HD 4K",

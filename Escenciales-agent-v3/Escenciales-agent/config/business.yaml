@@ -194,11 +194,22 @@ catalogo:
       - recepción omnidireccional de 360 grados
       - construcción metálica
       - canales locales HD gratuitos cuando existe señal disponible
+    capacidad_confirmada_por_propietaria: >
+      Es una antena amplificada de alta potencia, con una capacidad de captación
+      claramente superior a una antena interior convencional sin amplificador.
+      Funciona como un potenciador de la señal digital terrestre disponible: está
+      diseñada para captar y reforzar señales débiles y mejorar la recepción de
+      canales nacionales en HD, incluso en sectores de menor cobertura. No crea
+      señal donde no llega ninguna transmisión digital terrestre.
     claim_alcance_publicado: "322 km"
     regla_recepcion: >
-      No garantizar cantidad de canales, señal, calidad ni alcance. Para favorecer
-      la recepción, instalar la antena en un lugar sin obstáculos. La señal también
-      depende de la ubicación, la cobertura local y el televisor.
+      Explicar que, por ser amplificada y de alta potencia, capta y refuerza señales
+      débiles mejor que una antena interior convencional. Nunca decir que necesita
+      la misma cobertura o se comporta igual que una antena normal. Puede mejorar
+      mucho la recepción en lugares con cobertura baja, pero no crea señal donde
+      no existe transmisión digital terrestre. No garantizar cantidad exacta de
+      canales, calidad ni alcance. Para favorecer la recepción, instalarla en un
+      lugar sin obstáculos; el resultado también depende de la ubicación y el TV.
     canales_abiertos_posibles:
       - TVN
       - Mega
@@ -211,9 +222,11 @@ catalogo:
       Mencionar estos canales solo como ejemplos posibles en sectores donde estén
       disponibles. Nunca asegurar que recibirá todos ni una cantidad determinada.
     zonas_rurales: >
-      Puede funcionar en zonas rurales cuando existe cobertura de televisión digital
-      terrestre en el sector. La recepción mejora con una señal disponible y una
-      ubicación despejada, pero debe probarse y no puede garantizarse por comuna.
+      Sí puede funcionar en zonas rurales y sectores con cobertura baja porque su
+      amplificador tiene mayor capacidad para captar y reforzar la señal disponible
+      que una antena convencional. Mientras exista alguna señal digital terrestre
+      alcanzando el sector, puede mejorar la recepción; no garantizar el resultado
+      por comuna ni afirmar que funcionará donde no llega señal alguna.
     oferta_cantidad:
       cantidad: 2
       descuento_total_clp: 10000
@@ -270,9 +283,12 @@ guia_atencion_validada_por_propietaria:
     puede ayudar, salvo que ya esté identificado. Preguntar comuna solo cuando sirva
     para orientar el despacho o la instalación del producto.
   cobertura_antena: >
-    Explicar que canales y recepción dependen de la cobertura digital terrestre de
-    la ubicación. Puede pedirse comuna o localidad para entender el contexto, pero
-    no prometer una comprobación ni confirmar señal sin una fuente real.
+    Explicar primero que es una antena amplificada de alta potencia y que capta y
+    refuerza señales débiles mejor que una antena convencional, por lo que puede
+    mejorar mucho la recepción en sectores de baja cobertura y recibir canales
+    nacionales en HD cuando su señal alcanza el sector. No decir que necesita la
+    misma cobertura de una antena normal. Puede pedirse comuna o localidad para
+    entender el contexto, pero no prometer una comprobación ni garantizar señal.
   seguimiento_proactivo: >
     Solo existe un seguimiento automático autorizado: después de entregar el enlace
     oficial de compra, si el cliente no responde durante 15 minutos, preguntar una

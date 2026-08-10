@@ -1,5 +1,17 @@
 # Cambios
 
+## 3.5.0 — 2026-08-10
+
+- Identificación de anuncios endurecida con evidencia ponderada de título, texto y
+  URL, más clasificación visual con confianza mínima.
+- Si los metadatos y la miniatura se contradicen, el agente pregunta el producto en
+  vez de adivinar o heredar uno anterior de la conversación.
+- Las miniaturas se analizan con mayor detalle y criterios visuales específicos para
+  TENS, antena y ducha.
+- Descripción corregida de la antena amplificada: mayor capacidad de captación y
+  refuerzo de señales débiles que una antena convencional, sin prometer señal donde
+  no existe transmisión digital terrestre.
+
 ## 3.4.0 — 2026-08-09
 
 - Paridad comercial obligatoria entre WhatsApp, Messenger e Instagram.

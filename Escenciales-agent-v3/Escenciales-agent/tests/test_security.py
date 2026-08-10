@@ -8,7 +8,10 @@ from unittest.mock import patch
 from fastapi import HTTPException, Request
 
 from agent.brain import cargar_system_prompt
-from agent.providers.meta_multichannel import ProveedorMetaMulticanal
+from agent.providers.meta_multichannel import (
+    ProveedorMetaMulticanal,
+    _producto_desde_referencia_anuncio,
+)
 
 
 def request_con_firma(firma: str) -> Request:
@@ -131,6 +134,29 @@ class SeguridadWebhookTests(unittest.TestCase):
                     os.environ.pop(nombre, None)
                 else:
                     os.environ[nombre] = valor
+
+    def test_referencia_de_anuncio_prioriza_titulo_especifico(self):
+        producto = _producto_desde_referencia_anuncio({
+            "headline": "Electroestimulador TENS con 4 electrodos",
+            "body": "Conoce también nuestro filtro de ducha",
+            "source_url": "https://chilessentials.cl/campana-general",
+        })
+        self.assertEqual(producto, "Electroestimulador TENS")
+
+    def test_referencia_generica_no_adivina_antena(self):
+        producto = _producto_desde_referencia_anuncio({
+            "headline": "Mejora la señal",
+            "body": "Conoce nuestra oferta y pide más información",
+            "source_type": "ad",
+        })
+        self.assertIsNone(producto)
+
+    def test_referencia_conflictiva_no_adivina_producto(self):
+        producto = _producto_desde_referencia_anuncio({
+            "source_url": "https://chilessentials.cl/products/antena",
+            "referer_uri": "https://chilessentials.cl/products/ducha",
+        })
+        self.assertIsNone(producto)
 
 
 class EnvioInstagramTests(unittest.IsolatedAsyncioTestCase):
