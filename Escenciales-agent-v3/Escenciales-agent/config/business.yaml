@@ -266,7 +266,8 @@ guia_atencion_validada_por_propietaria:
   precio_producto: >
     En la primera explicación dar primero el precio vigente del producto consultado,
     el envío gratis en Chile y el pago al recibir. Después agregar un beneficio o
-    enganche relevante y como máximo una pregunta breve sobre ese mismo producto.
+    enganche relevante. Hacer una pregunta breve solo cuando sea necesaria para
+    responder o avanzar; no añadir cierres automáticos.
   compra_por_web: >
     No enviar el enlace durante una consulta inicial. Enviarlo solo cuando el cliente
     pregunte cómo comprar, pida el enlace o diga que quiere avanzar. Explicar en
@@ -288,7 +289,9 @@ guia_atencion_validada_por_propietaria:
     mejorar mucho la recepción en sectores de baja cobertura y recibir canales
     nacionales en HD cuando su señal alcanza el sector. No decir que necesita la
     misma cobertura de una antena normal. Puede pedirse comuna o localidad para
-    entender el contexto, pero no prometer una comprobación ni garantizar señal.
+    entender el contexto únicamente si el cliente pregunta por cobertura, pero no
+    prometer una comprobación ni garantizar señal. No agregar espontáneamente
+    advertencias sobre ubicación, obstáculos o resultados si no fueron consultados.
   seguimiento_proactivo: >
     Solo existe un seguimiento automático autorizado: después de entregar el enlace
     oficial de compra, si el cliente no responde durante 15 minutos, preguntar una

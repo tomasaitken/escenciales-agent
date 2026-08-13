@@ -7,6 +7,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from agent.brain import (
+    acortar_respuesta,
     cargar_system_prompt,
     generar_respuesta,
     identificar_producto_desde_imagen,
@@ -28,6 +29,10 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("al momento de recibir el producto", prompt)
         self.assertIn("emoji cálido", prompt)
         self.assertIn("Máximo uno por mensaje", prompt)
+        self.assertIn("orientativo de 55 palabras", prompt)
+        self.assertIn("Si la duda se resuelve con menos, termina ahí", prompt)
+        self.assertIn("No agregues advertencias, condiciones, instrucciones", prompt)
+        self.assertIn("No repitas precio, envío, pago", prompt)
 
     def test_prompt_no_expone_direccion_y_fija_ubicacion_aprobada(self):
         prompt = cargar_system_prompt("instagram")
@@ -88,6 +93,8 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("señales digitales débiles mejor", prompt)
         self.assertIn("misma cobertura que una antena normal", prompt)
         self.assertIn("no llega señal alguna", prompt)
+        self.assertIn("No agregues espontáneamente advertencias", prompt)
+        self.assertIn("No cierres preguntando comuna, localidad, casa o zona rural", prompt)
 
     def test_bloquea_direccion_exacta_en_la_salida(self):
         respuesta = sanitizar_respuesta(
@@ -113,6 +120,25 @@ class OpenAIResponsesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("հետո", respuesta)
         self.assertIn("completas tus datos", respuesta)
+
+    def test_limita_respuesta_larga_sin_cortar_frase(self):
+        larga = (
+            "La antena cuesta $22.990, con envío gratis y pago al recibir. "
+            "Es un amplificador de señal de alta potencia. "
+            + "Esta explicación sobra y se extiende demasiado. " * 12
+        )
+
+        respuesta = acortar_respuesta(larga)
+
+        self.assertLessEqual(len(respuesta.split()), 55)
+        self.assertTrue(respuesta.endswith("."))
+        self.assertIn("$22.990", respuesta)
+
+    def test_prompt_no_duplica_instrucciones_del_enlace(self):
+        prompt = cargar_system_prompt("messenger")
+
+        self.assertIn("no repitas esas instrucciones", prompt)
+        self.assertIn("no dupliques esos", prompt)
 
     async def test_usa_responses_api_y_modelo_configurado(self):
         async def handler(request: httpx.Request) -> httpx.Response:

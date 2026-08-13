@@ -3,6 +3,7 @@ import os
 import logging
 import hashlib
 import re
+import time
 import unicodedata
 from contextlib import asynccontextmanager
 from contextlib import suppress
@@ -59,6 +60,26 @@ PORT = int(os.getenv("PORT", 8000))
 _fragmentos_pendientes: dict[str, list] = {}
 _version_fragmentos: dict[str, int] = {}
 _productos_anuncio_cache: dict[str, str] = {}
+_mensajes_recientes: dict[str, float] = {}
+
+
+def _es_repetido_reciente(msg, texto: str, ventana_segundos: float = 60.0) -> bool:
+    """Evita responder dos veces cuando Meta repite el mismo texto con otro ID."""
+    ahora = time.monotonic()
+    texto_normalizado = re.sub(r"\s+", " ", _normalizar(texto)).strip()
+    clave = (
+        f"{msg.canal}:{msg.telefono}:{msg.contexto_producto or ''}:"
+        f"{texto_normalizado}"
+    )
+    anterior = _mensajes_recientes.get(clave)
+    _mensajes_recientes[clave] = ahora
+
+    if len(_mensajes_recientes) > 1000:
+        limite = ahora - max(ventana_segundos, 60.0)
+        for item, instante in list(_mensajes_recientes.items()):
+            if instante < limite:
+                _mensajes_recientes.pop(item, None)
+    return anterior is not None and ahora - anterior <= ventana_segundos
 
 
 def _texto_con_contexto_anuncio(texto: str, producto: str | None) -> str:
@@ -375,7 +396,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.5.0",
+    version="3.6.0",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -387,7 +408,7 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.5.0"
+        "version": "3.6.0"
     }
 
 
@@ -552,6 +573,13 @@ async def procesar_mensajes(mensajes):
                 texto_para_historial = texto
 
             if not texto:
+                continue
+
+            if _es_repetido_reciente(msg, texto):
+                logger.info(
+                    "Mensaje semánticamente duplicado ignorado contacto=%s",
+                    contacto_hash,
+                )
                 continue
 
             texto_para_historial = _texto_con_contexto_anuncio(

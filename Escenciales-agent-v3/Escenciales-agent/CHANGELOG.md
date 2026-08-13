@@ -1,5 +1,16 @@
 # Cambios
 
+## 3.6.0 — 2026-08-13
+
+- Respuestas comerciales reducidas a 2 o 3 frases y un máximo orientativo y técnico
+  de 55 palabras.
+- Eliminados cierres, advertencias e instrucciones no solicitadas por el cliente.
+- La cobertura de la antena solo añade condiciones cuando la consulta realmente es
+  sobre recepción o funcionamiento.
+- La respuesta principal deja de repetir los pasos incluidos en el mensaje separado
+  con el enlace de compra.
+- Protección contra mensajes idénticos que Meta entrega dos veces con IDs distintos.
+
 ## 3.5.0 — 2026-08-10
 
 - Identificación de anuncios endurecida con evidencia ponderada de título, texto y

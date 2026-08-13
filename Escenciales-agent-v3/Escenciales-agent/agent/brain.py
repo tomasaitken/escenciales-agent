@@ -33,6 +33,30 @@ PATRON_ESCRITURA_NO_LATINA = re.compile(
     "[\u0400-\u052f\u0530-\u058f\u0590-\u08ff\u3040-\u30ff\u3400-\u9fff]"
 )
 
+MAX_PALABRAS_RESPUESTA = 55
+
+
+def acortar_respuesta(respuesta: str, max_palabras: int = MAX_PALABRAS_RESPUESTA) -> str:
+    """Limita respuestas comerciales largas sin dejar una frase a medias."""
+    palabras = respuesta.split()
+    if len(palabras) <= max_palabras:
+        return respuesta.strip()
+
+    fragmentos = re.split(r"(?<=[.!?])\s+", respuesta.strip())
+    elegidos: list[str] = []
+    total = 0
+    for fragmento in fragmentos:
+        cantidad = len(fragmento.split())
+        if total + cantidad > max_palabras:
+            break
+        elegidos.append(fragmento)
+        total += cantidad
+    if elegidos:
+        return " ".join(elegidos).strip()
+
+    recorte = " ".join(palabras[:max_palabras]).rstrip(",;:")
+    return recorte.rstrip(".!?") + "."
+
 
 def cargar_prompts_config() -> dict:
     try:
@@ -80,7 +104,7 @@ def sanitizar_respuesta(respuesta: str) -> str:
         logger.warning("Se eliminó escritura no latina de la respuesta del agente")
         respuesta = PATRON_ESCRITURA_NO_LATINA.sub("", respuesta)
         respuesta = re.sub(r"[ \t]{2,}", " ", respuesta)
-    return respuesta.strip()
+    return acortar_respuesta(respuesta.strip())
 
 
 def cargar_system_prompt(canal: str = "whatsapp") -> str:

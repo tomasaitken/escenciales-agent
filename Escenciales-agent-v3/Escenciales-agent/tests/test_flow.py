@@ -39,6 +39,20 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await inicializar_db()
         main._productos_anuncio_cache.clear()
+        main._mensajes_recientes.clear()
+
+    def test_detecta_texto_repetido_reciente_aunque_meta_cambie_id(self):
+        mensaje = MensajeEntrante(
+            telefono="cliente-duplicado",
+            texto="Hola, info Antena Digital Full HD 4K. ¿Precio y cómo comprar?",
+            mensaje_id="uno",
+            es_propio=False,
+            canal="messenger",
+            contexto_producto="Antena Digital Full HD 4K",
+        )
+
+        self.assertFalse(main._es_repetido_reciente(mensaje, mensaje.texto))
+        self.assertTrue(main._es_repetido_reciente(mensaje, mensaje.texto))
 
     def test_enlaces_de_compra_son_oficiales_y_no_se_repiten(self):
         casos = {
