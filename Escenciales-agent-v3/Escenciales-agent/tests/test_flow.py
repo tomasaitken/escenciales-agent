@@ -54,6 +54,25 @@ class FlujoHandoffTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(main._es_repetido_reciente(mensaje, mensaje.texto))
         self.assertTrue(main._es_repetido_reciente(mensaje, mensaje.texto))
 
+    async def test_interruptor_global_pausa_respuestas_sin_apagar_webhook(self):
+        proveedor = ProveedorFalso()
+        mensaje = MensajeEntrante(
+            telefono="cliente-pausa-global",
+            texto="Hola, quiero información de la antena",
+            mensaje_id="pausa-global",
+            es_propio=False,
+            canal="whatsapp",
+        )
+
+        with patch.dict(os.environ, {"AGENT_RESPONSES_ENABLED": "false"}), patch.object(
+            main, "proveedor", proveedor
+        ):
+            self.assertFalse(main._respuestas_habilitadas())
+            await main.procesar_mensajes([mensaje])
+
+        self.assertEqual(proveedor.enviados, [])
+        self.assertTrue(main._respuestas_habilitadas())
+
     def test_enlaces_de_compra_son_oficiales_y_no_se_repiten(self):
         casos = {
             "Antena Digital Full HD 4K": "53910086058352",

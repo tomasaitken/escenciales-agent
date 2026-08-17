@@ -63,6 +63,12 @@ _productos_anuncio_cache: dict[str, str] = {}
 _mensajes_recientes: dict[str, float] = {}
 
 
+def _respuestas_habilitadas() -> bool:
+    """Interruptor operativo global; mantiene webhooks activos sin contestar."""
+    valor = os.getenv("AGENT_RESPONSES_ENABLED", "true").strip().lower()
+    return valor not in {"0", "false", "no", "off", "disabled", "paused"}
+
+
 def _es_repetido_reciente(msg, texto: str, ventana_segundos: float = 60.0) -> bool:
     """Evita responder dos veces cuando Meta repite el mismo texto con otro ID."""
     ahora = time.monotonic()
@@ -396,7 +402,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Escenciales — Agente comercial omnicanal",
-    version="3.6.0",
+    version="3.6.1",
     lifespan=lifespan
 )
 app.include_router(admin_router)
@@ -408,7 +414,8 @@ async def health_check():
     return {
         "status": "ok",
         "agent": "Escenciales",
-        "version": "3.6.0"
+        "version": "3.6.1",
+        "responses_enabled": _respuestas_habilitadas(),
     }
 
 
@@ -421,6 +428,12 @@ async def webhook_verificacion(request: Request):
 
 
 async def procesar_mensajes(mensajes):
+    if not _respuestas_habilitadas():
+        logger.warning(
+            "Agente pausado globalmente; %s mensaje(s) recibido(s) sin respuesta",
+            len(mensajes),
+        )
+        return
     if len(mensajes) > 1:
         await asyncio.gather(*(procesar_mensajes([msg]) for msg in mensajes))
         return
